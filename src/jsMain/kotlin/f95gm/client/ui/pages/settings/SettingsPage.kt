@@ -11,6 +11,7 @@ import f95gm.client.model.settings.CardSize
 import f95gm.client.model.settings.PageSize
 import f95gm.client.model.settings.UpdateCheckInterval
 import f95gm.client.state.settings.appSettings
+import f95gm.client.ui.navigation.NavbarPage
 import f95gm.client.ui.navigation.responsiveNavbar
 import f95gm.client.ui.shared.dropdown.bootstrapDropdown
 import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
@@ -46,7 +47,7 @@ internal fun RenderContext.settingsPage() {
     div("settings-page") {
         responsiveNavbar(
             navigationId = "settings-navigation",
-            catalogLink = true,
+            page = NavbarPage.SETTINGS,
             toolbar = {}
         )
         div("settings-content container-xl py-4") {

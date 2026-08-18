@@ -4,49 +4,45 @@ import f95gm.messages.UiMessages
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.awt.event.WindowAdapter
+import java.awt.event.WindowEvent
 import javax.swing.*
-import javax.swing.event.PopupMenuEvent
-import javax.swing.event.PopupMenuListener
+import javax.swing.border.TitledBorder
 
 internal class TrayMenu(
-    private val showConsole: () -> Unit,
-    private val exit: () -> Unit
+    showConsole: () -> Unit,
+    exit: () -> Unit
 ) {
-    private val popup = JPopupMenu()
-    private var anchor: JWindow? = null
+    private val menuPanel = JPanel()
+    private var menuWindow: JWindow? = null
     private var dark = true
 
     init {
-        popup.add(menuItem(UiMessages.app_showConsole(), showConsole))
-        popup.add(menuItem(UiMessages.app_exit(), exit))
-        popup.addPopupMenuListener(object : PopupMenuListener {
-            override fun popupMenuWillBecomeVisible(event: PopupMenuEvent) = Unit
-
-            override fun popupMenuWillBecomeInvisible(event: PopupMenuEvent) {
-                anchor?.dispose()
-                anchor = null
-            }
-
-            override fun popupMenuCanceled(event: PopupMenuEvent) {
-                anchor?.dispose()
-                anchor = null
-            }
-        })
+        menuPanel.layout = BoxLayout(menuPanel, BoxLayout.Y_AXIS)
+        menuPanel.add(menuItem(UiMessages.app_showConsole(), showConsole))
+        menuPanel.add(JSeparator())
+        menuPanel.add(menuItem(UiMessages.app_exit(), exit))
         applyTheme()
     }
 
     fun showAt(point: Point) {
         SwingUtilities.invokeLater {
-            popup.isVisible = false
-            anchor?.dispose()
-            val location = popupLocation(point)
-            anchor = JWindow().apply {
+            hidePopup()
+            menuWindow = JWindow().apply {
                 background = Color(0, 0, 0, 0)
-                setSize(1, 1)
-                setLocation(location)
+                focusableWindowState = true
+                isAutoRequestFocus = true
+                addWindowFocusListener(object : WindowAdapter() {
+                    override fun windowLostFocus(event: WindowEvent) {
+                        hidePopup()
+                    }
+                })
+                contentPane = menuPanel
+                pack()
+                location = popupLocation(point, size)
                 isVisible = true
+                requestFocusInWindow()
             }
-            anchor?.let { popup.show(it, 0, 0) }
         }
     }
 
@@ -59,10 +55,13 @@ internal class TrayMenu(
 
     fun dispose() {
         SwingUtilities.invokeLater {
-            popup.isVisible = false
-            anchor?.dispose()
-            anchor = null
+            hidePopup()
         }
+    }
+
+    private fun hidePopup() {
+        menuWindow?.dispose()
+        menuWindow = null
     }
 
     private fun menuItem(label: String, action: () -> Unit) = JButton(label).apply {
@@ -86,12 +85,12 @@ internal class TrayMenu(
             }
         })
         addActionListener {
-            popup.isVisible = false
+            hidePopup()
             action()
         }
     }
 
-    private fun popupLocation(point: Point): Point {
+    private fun popupLocation(point: Point, size: Dimension): Point {
         val configuration = screenConfiguration(point)
         val bounds = configuration.bounds
         val insets = Toolkit.getDefaultToolkit().getScreenInsets(configuration)
@@ -99,7 +98,6 @@ internal class TrayMenu(
         val top = bounds.y + insets.top
         val right = bounds.x + bounds.width - insets.right
         val bottom = bounds.y + bounds.height - insets.bottom
-        val size = popup.preferredSize
         val x = (point.x - size.width + 12).coerceIn(left, right - size.width)
         val y = if (point.y > (top + bottom) / 2) {
             point.y - size.height - 4
@@ -119,24 +117,36 @@ internal class TrayMenu(
         val background = menuBackground()
         val foreground = menuForeground()
 
-        popup.background = background
-        popup.border = BorderFactory.createLineBorder(selectionBackground())
-        val items = popup.components.filterIsInstance<JButton>()
+        menuPanel.background = background
+        menuPanel.border = BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(selectionBackground()),
+            UiMessages.app_brandName(),
+            TitledBorder.CENTER,
+            TitledBorder.TOP,
+            Font(Font.SANS_SERIF, Font.BOLD, 12),
+            foreground
+        )
+        val items = menuPanel.components.filterIsInstance<JButton>()
         val width = items.maxOfOrNull { it.preferredSize.width } ?: return
         items.forEach { item ->
             item.background = background
             item.foreground = foreground
-            item.border = BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(selectionBackground()),
-                BorderFactory.createEmptyBorder(8, 25, 8, 25)
-            )
+            item.border = BorderFactory.createEmptyBorder(8, 25, 8, 25)
             item.alignmentX = Component.LEFT_ALIGNMENT
             item.minimumSize = Dimension(width, item.preferredSize.height)
             item.preferredSize = Dimension(width, item.preferredSize.height)
             item.maximumSize = Dimension(width, item.preferredSize.height)
         }
-        popup.revalidate()
-        popup.repaint()
+        menuPanel.components.filterIsInstance<JSeparator>().forEach { separator ->
+            separator.background = background
+            separator.foreground = selectionBackground()
+            separator.alignmentX = Component.LEFT_ALIGNMENT
+            separator.minimumSize = Dimension(width, separator.preferredSize.height)
+            separator.preferredSize = Dimension(width, separator.preferredSize.height)
+            separator.maximumSize = Dimension(width, separator.preferredSize.height)
+        }
+        menuPanel.revalidate()
+        menuPanel.repaint()
     }
 
     private fun menuBackground() = if (dark) Color(0x21, 0x25, 0x29) else Color.WHITE

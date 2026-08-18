@@ -11,13 +11,13 @@ import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.navbarReloadButton(myGamesPage: Boolean) {
+internal fun RenderContext.navbarReloadButton(page: NavbarPage) {
     button("page-reload $secondaryNavigationButtonClass px-2") {
         type("button")
         attr("title", UiMessages.app_reload())
         attr("aria-label", UiMessages.app_reload())
         span("bi bi-arrow-clockwise") {}
-        if (myGamesPage) {
+        if (page == NavbarPage.TRACKED_GAMES || page == NavbarPage.SETTINGS) {
             disabled(marks.data.map { it.loading || it.checking })
             clicks handledBy { checkMarkedGames(showToast = false) }
         } else {

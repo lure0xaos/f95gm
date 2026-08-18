@@ -17,10 +17,7 @@ import f95gm.client.ui.detail.metadata.detailGenres
 import f95gm.client.ui.detail.metadata.detailMarkControls
 import f95gm.client.ui.detail.metadata.detailMetaCards
 import f95gm.client.ui.detail.renderDetailBody
-import f95gm.client.ui.navigation.jvmConnectionDetails
-import f95gm.client.ui.navigation.navbarAccountLinks
-import f95gm.client.ui.navigation.navbarBrand
-import f95gm.client.ui.navigation.navbarNavigationLink
+import f95gm.client.ui.navigation.*
 import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -31,7 +28,7 @@ internal fun RenderContext.detailPage(threadId: String, backRoute: Route) {
         div("detail-nav navbar border-bottom py-3") {
             navbarBrand()
             jvmConnectionDetails()
-            navbarNavigationLink(catalogLink = false)
+            navbarNavigationLink(NavbarLink.TRACKED_GAMES)
             navbarAccountLinks()
         }
         div("detail-actions d-flex justify-content-between align-items-center gap-3 mt-4") {

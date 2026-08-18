@@ -17,6 +17,6 @@ internal fun RenderContext.navbarBrand(removeEndMargin: Boolean = false) {
             alt(UiMessages.app_brandName())
             src("favicon.png")
         }
-        span("brand-name") { +UiMessages.app_brandName() }
+        span("brand-name") { +UiMessages.app_brandShortName() }
     }
 }

@@ -20,6 +20,7 @@ import f95gm.client.ui.catalog.filters.filterField
 import f95gm.client.ui.catalog.filters.filterPicker
 import f95gm.client.ui.catalog.filters.prefixChip
 import f95gm.client.ui.catalog.saved.savedFilterManager
+import f95gm.client.ui.navigation.NavbarPage
 import f95gm.client.ui.navigation.responsiveNavbar
 import f95gm.client.ui.shared.dropdown.bootstrapDropdown
 import f95gm.client.ui.shared.navigation.navigationButtonClass
@@ -36,7 +37,7 @@ import kotlinx.coroutines.flow.map
 internal fun RenderContext.catalogToolbar() {
     responsiveNavbar(
         navigationId = "catalog-navigation",
-        catalogLink = false,
+        page = NavbarPage.CATALOG,
         toolbar = { catalogToolbarNavigation() },
         trailingAction = {
             button("filter-toggle") {

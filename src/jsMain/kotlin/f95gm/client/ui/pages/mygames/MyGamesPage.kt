@@ -11,6 +11,7 @@ import f95gm.client.actions.marks.loading.retryMarkedGames
 import f95gm.client.model.marks.markedGamesView
 import f95gm.client.state.marks.marks
 import f95gm.client.state.settings.appSettings
+import f95gm.client.ui.navigation.NavbarPage
 import f95gm.client.ui.navigation.responsiveNavbar
 import f95gm.client.ui.shared.loading.pageLoadingOverlay
 import f95gm.client.ui.shared.navigation.successOutlineNavigationButtonClass
@@ -22,7 +23,7 @@ internal fun RenderContext.myGamesPage() {
     div("marked-page") {
         responsiveNavbar(
             navigationId = "marked-navigation",
-            catalogLink = true,
+            page = NavbarPage.TRACKED_GAMES,
             toolbar = { myGamesToolbar() },
             leadingAccountAction = {
                 button(successOutlineNavigationButtonClass) {

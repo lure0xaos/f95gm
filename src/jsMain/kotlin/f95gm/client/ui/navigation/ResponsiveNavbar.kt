@@ -6,9 +6,15 @@ import dev.fritz2.core.type
 import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
 import f95gm.messages.UiMessages
 
+internal enum class NavbarPage {
+    CATALOG,
+    TRACKED_GAMES,
+    SETTINGS
+}
+
 internal fun RenderContext.responsiveNavbar(
     navigationId: String,
-    catalogLink: Boolean,
+    page: NavbarPage,
     toolbar: RenderContext.() -> Unit,
     trailingAction: RenderContext.() -> Unit = {},
     leadingAccountAction: RenderContext.() -> Unit = {}
@@ -19,8 +25,15 @@ internal fun RenderContext.responsiveNavbar(
                 div("navbar-row d-flex flex-wrap align-items-center w-100 gap-2 px-2") {
                     navbarBrand(removeEndMargin = true)
                     jvmConnectionDetails()
-                    navbarReloadButton(myGamesPage = catalogLink)
-                    navbarNavigationLink(catalogLink)
+                    navbarReloadButton(page)
+                    when (page) {
+                        NavbarPage.CATALOG -> navbarNavigationLink(NavbarLink.TRACKED_GAMES)
+                        NavbarPage.TRACKED_GAMES -> navbarNavigationLink(NavbarLink.CATALOG)
+                        NavbarPage.SETTINGS -> {
+                            navbarNavigationLink(NavbarLink.CATALOG)
+                            navbarNavigationLink(NavbarLink.TRACKED_GAMES)
+                        }
+                    }
                     button("navbar-toggle $secondaryNavigationButtonClass navbar-toggler d-inline-flex d-xl-none") {
                         type("button")
                         attr("data-bs-toggle", "collapse")

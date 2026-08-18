@@ -19,7 +19,7 @@ internal class DesktopController(private val requestShutdown: () -> Unit) {
             if (!SystemTray.isSupported()) return@runCatching
 
             val menu = TrayMenu(ConsoleWindow::show, requestShutdown)
-            val icon = TrayIcon(trayImage(), "F95GM").apply {
+            val icon = TrayIcon(trayImage(), UiMessages.app_brandName()).apply {
                 isImageAutoSize = true
                 addMouseListener(object : MouseAdapter() {
                     override fun mousePressed(event: MouseEvent) {

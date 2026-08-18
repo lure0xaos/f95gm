@@ -8,10 +8,10 @@ import f95gm.client.ui.shared.navigation.navigationButtonClass
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.navbarNavigationLink(catalogLink: Boolean) {
+internal fun RenderContext.navbarNavigationLink(link: NavbarLink) {
     a("page-nav $navigationButtonClass") {
-        clicks.map { if (catalogLink) latestUpdatesRoute else myGamesRoute } handledBy router.navTo
-        span(if (catalogLink) "bi bi-grid me-1" else "bi bi-bookmark-heart me-1") {}
-        +(if (catalogLink) UiMessages.app_catalog() else UiMessages.app_myGames())
+        clicks.map { if (link == NavbarLink.CATALOG) latestUpdatesRoute else myGamesRoute } handledBy router.navTo
+        span(if (link == NavbarLink.CATALOG) "bi bi-grid me-1" else "bi bi-bookmark-heart me-1") {}
+        +(if (link == NavbarLink.CATALOG) UiMessages.app_catalog() else UiMessages.app_myGames())
     }
 }
