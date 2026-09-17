@@ -1,5 +1,9 @@
 package f95gm.client.actions.catalog.filters.selection
 
-internal fun selectTagPicker(value: String) {
-    addSelectedOption(value, excluded = false, prefix = false)
+import f95gm.client.model.catalog.FilterOptionKind
+import f95gm.client.model.catalog.FilterSelection
+import f95gm.client.state.runtime.ClientCatalogActionsPort
+
+internal fun selectTagPicker(runtime: ClientCatalogActionsPort, value: String) {
+    addSelectedOption(runtime, value, FilterSelection.INCLUDED, FilterOptionKind.TAG)
 }

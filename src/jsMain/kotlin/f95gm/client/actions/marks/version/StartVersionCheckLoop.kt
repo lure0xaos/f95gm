@@ -1,30 +1,34 @@
 package f95gm.client.actions.marks.version
 
+import f95gm.client.actions.marks.loading.MarkCheckNotification
 import f95gm.client.actions.marks.loading.checkMarkedGamesInternal
-import f95gm.client.state.marks.versionCheckLoopStarted
-import f95gm.client.state.runtime.scope
-import f95gm.client.state.session.session
-import f95gm.client.state.settings.appSettings
-import kotlinx.coroutines.delay
+import f95gm.client.state.runtime.ClientJobKey
+import f95gm.client.state.runtime.ClientMarksActionsPort
+import f95gm.client.state.runtime.launchVersionCheckOperation
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
-internal fun startVersionCheckLoop() {
-    if (versionCheckLoopStarted) return
-    versionCheckLoopStarted = true
-    scope.launch {
-        while (session.data.first().authenticated) {
-            val interval = appSettings.data.first().updateCheckInterval.millis
-            if (interval > 0) {
-                delay(interval.milliseconds)
-                if (session.data.first().authenticated && appSettings.data.first().updateCheckInterval.millis == interval) {
-                    checkMarkedGamesInternal(notify = true)
+internal fun startVersionCheckLoop(runtime: ClientMarksActionsPort) {
+    if (runtime.requests.isJobActive(ClientJobKey.VERSION_CHECK)) return
+    runtime.launchVersionCheckOperation {
+        combine(
+            runtime.session.data,
+            runtime.appSettingsView.data
+        ) { sessionState, settings -> sessionState.authenticated to settings.updateCheckInterval.duration }
+            .collectLatest { (authenticated, interval) ->
+                if (!authenticated) return@collectLatest
+                runtime.clock.delay(if (interval.isPositive()) interval else 60.seconds)
+                if (runtime.session.data.first().authenticated &&
+                    runtime.appSettingsView.data.first().updateCheckInterval.duration == interval && interval.isPositive()
+                ) {
+                    checkMarkedGamesInternal(runtime, MarkCheckNotification.SHOW_TOAST)
                 }
-            } else {
-                delay(60_000L.milliseconds)
             }
-        }
-        versionCheckLoopStarted = false
     }
+}
+
+internal fun stopVersionCheckLoop(runtime: ClientMarksActionsPort) {
+    runtime.requests.cancelJob(ClientJobKey.VERSION_CHECK)
 }

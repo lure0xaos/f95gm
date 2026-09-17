@@ -1,6 +1,9 @@
 package f95gm.client.model.detail
 
 import f95gm.domain.values.*
+import f95gm.client.state.runtime.AsyncState
+import f95gm.client.state.runtime.isLoading
+import f95gm.client.state.runtime.errorMessage
 
 internal data class DetailState(
     val threadId: F95ThreadId = F95ThreadId(""),
@@ -12,6 +15,8 @@ internal data class DetailState(
     val overviewHtml: F95Html = F95Html(""),
     val sections: List<DetailSection> = emptyList(),
     val bodyHtml: F95Html = F95Html(""),
-    val loading: Boolean = false,
-    val error: String = ""
+    val async: AsyncState<Unit> = AsyncState.Idle
 )
+
+internal val DetailState.loading: Boolean get() = async.isLoading
+internal val DetailState.error: String get() = async.errorMessage

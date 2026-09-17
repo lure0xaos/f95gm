@@ -4,9 +4,10 @@ import java.awt.Color
 import java.io.OutputStream
 import javax.swing.JTextPane
 import javax.swing.SwingUtilities
+import f95gm.server.kernel.ResourceLock
 
 internal class ConsoleOutput : OutputStream() {
-    private val lock = Any()
+    private val lock = ResourceLock()
     private val buffer = StringBuilder()
     private var textArea: JTextPane? = null
 
@@ -15,7 +16,7 @@ internal class ConsoleOutput : OutputStream() {
         refresh(area)
     }
 
-    fun snapshot(): String = synchronized(lock) { buffer.toString() }
+    fun snapshot(): String = lock.withLock { buffer.toString() }
 
     override fun write(byte: Int) {
         write(byteArrayOf(byte.toByte()))
@@ -23,7 +24,7 @@ internal class ConsoleOutput : OutputStream() {
 
     override fun write(bytes: ByteArray, offset: Int, length: Int) {
         val text = bytes.copyOfRange(offset, offset + length).toString(Charsets.UTF_8)
-        synchronized(lock) {
+        lock.withLock {
             buffer.append(text)
             if (buffer.length > 100_000) buffer.delete(0, buffer.length - 100_000)
         }

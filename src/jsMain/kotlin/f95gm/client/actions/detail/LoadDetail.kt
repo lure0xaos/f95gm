@@ -1,24 +1,29 @@
 package f95gm.client.actions.detail
 
-import f95gm.client.data.api.getJson
-import f95gm.client.data.detail.parseDetail
+import f95gm.client.data.api.apiResult
+import f95gm.client.data.api.apiUserMessage
+import f95gm.client.data.api.ApiFallbacks
 import f95gm.client.model.detail.DetailState
-import f95gm.client.state.detail.detail
-import f95gm.domain.api.F95Api
+import f95gm.client.state.runtime.ClientDetailActionsPort
+import f95gm.client.state.runtime.ClientJobKey
 import f95gm.domain.values.F95ThreadId
 import f95gm.messages.UiMessages
+import f95gm.client.state.runtime.AsyncState
 
-internal suspend fun loadDetail(threadId: String) {
-    detail.enqueue { DetailState(threadId = F95ThreadId(threadId), loading = true) }
-    runCatching {
-        parseDetail(getJson("${F95Api.ITEM}/$threadId"))
+internal suspend fun loadDetail(runtime: ClientDetailActionsPort, threadId: F95ThreadId) {
+    val requestToken = runtime.requests.beginRequest(ClientJobKey.DETAIL_LOAD)
+    runtime.detail.enqueue { DetailState(threadId = threadId, async = AsyncState.Loading) }
+    apiResult {
+        runtime.detailApi.detail(threadId)
     }.onSuccess { result ->
-        detail.enqueue { result.copy(loading = false, error = "") }
+        if (!runtime.requests.isCurrentRequest(ClientJobKey.DETAIL_LOAD, requestToken)) return@onSuccess
+        runtime.detail.enqueue { result.copy(async = AsyncState.Success(Unit)) }
     }.onFailure { error ->
-        detail.enqueue {
+        if (!runtime.requests.isCurrentRequest(ClientJobKey.DETAIL_LOAD, requestToken)) return@onFailure
+        runtime.detail.enqueue {
             DetailState(
-                threadId = F95ThreadId(threadId),
-                error = error.message ?: UiMessages.app_itemDetailsLoadFailed()
+                threadId = threadId,
+                async = AsyncState.Failure(error.apiUserMessage(ApiFallbacks.ItemDetails))
             )
         }
     }

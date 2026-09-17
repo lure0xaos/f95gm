@@ -1,0 +1,62 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:QueryEncode.kt:code in 'A'.code..'Z'.code || code in 'a'.code..'z'.code || code in '0'.code..'9'.code || code == '-'.code || code == '_'.code || code == '.'.code || code == '!'.code || code == '~'.code || code == '*'.code || code == '\''.code || code == '('.code || code == ')'.code</ID>
+    <ID>ComplexCondition:RestoreSessions.kt:!validIdentity || updatedAt &lt;= 0L || updatedAt &gt; now || now - updatedAt &gt; sessionMaxAgeSeconds * ServerConstants.MILLIS_PER_SECOND</ID>
+    <ID>ComplexCondition:RestoreSessions.kt:name.isValidStoredValue(ServerConstants.COOKIE_NAME_LENGTH) &amp;&amp; value.isValidStoredValue(ServerConstants.COOKIE_VALUE_LENGTH) &amp;&amp; value.none { it == ';' || it == '\r' || it == '\n' || it.code &lt; 0x20 }</ID>
+    <ID>ComplexCondition:SetCookiePair.kt:name.all(::isCookieNameCharacter) &amp;&amp; value.none { it == ';' || it == '\r' || it == '\n' || it.code &lt; 0x20 }</ID>
+    <ID>CyclomaticComplexMethod:ApiUserMessage.kt:internal fun Throwable.apiUserMessage: String</ID>
+    <ID>CyclomaticComplexMethod:AppendAnsi.kt:internal fun appendAnsi</ID>
+    <ID>CyclomaticComplexMethod:ConfigureRequestMonitoring.kt:private fun Application.installRequestMonitoringWithPolicy</ID>
+    <ID>CyclomaticComplexMethod:FilterAlias.kt:internal fun filterAlias: String</ID>
+    <ID>CyclomaticComplexMethod:FindJavaScriptAssignment.kt:internal fun findJavaScriptAssignment: Int?</ID>
+    <ID>CyclomaticComplexMethod:LocalizedDetailLabel.kt:internal fun localizedDetailLabel: String</ID>
+    <ID>CyclomaticComplexMethod:Login.kt:internal suspend fun login</ID>
+    <ID>CyclomaticComplexMethod:OriginPolicy.kt:OriginPolicy$fun accepts: Boolean</ID>
+    <ID>CyclomaticComplexMethod:RouteLocation.kt:RouteLocation$private fun pathRoute: Route?</ID>
+    <ID>CyclomaticComplexMethod:SanitizeThreadHtml.kt:internal fun sanitizeThreadHtml: SanitizedHtml</ID>
+    <ID>CyclomaticComplexMethod:SaveMark.kt:internal suspend fun saveMark</ID>
+    <ID>CyclomaticComplexMethod:TrimSectionBody.kt:internal fun trimSectionBody</ID>
+    <ID>ForEachOnRange:PaginationControls.kt:firstVisiblePage..lastVisiblePage</ID>
+    <ID>LoopWithTooManyJumpStatements:InstallDetailImageGallery.kt:for</ID>
+    <ID>LoopWithTooManyJumpStatements:Media.kt:&lt;no name provided&gt;$while</ID>
+    <ID>LoopWithTooManyJumpStatements:PlainGenreText.kt:while</ID>
+    <ID>LoopWithTooManyJumpStatements:TrimSectionBody.kt:while</ID>
+    <ID>MatchingDeclarationName:ApiExceptionMapper.kt:MappedApiException</ID>
+    <ID>MatchingDeclarationName:ConfigureApiRoutes.kt:ConfiguredApiEndpoint</ID>
+    <ID>MatchingDeclarationName:ConfigureRequestMonitoring.kt:RequestMonitoringConfiguration</ID>
+    <ID>MatchingDeclarationName:IdempotentMutation.kt:IdempotencyLease : AutoCloseable</ID>
+    <ID>MatchingDeclarationName:InitDatabase.kt:DatabaseInitializationFailure : IllegalStateException</ID>
+    <ID>MatchingDeclarationName:LimitedBody.kt:BodyLimitExceededException : IOException</ID>
+    <ID>MatchingDeclarationName:MarkedGamesViewState.kt:MarkedGamesView</ID>
+    <ID>MatchingDeclarationName:MediaContentType.kt:MediaContentTypeResult</ID>
+    <ID>MatchingDeclarationName:NavbarBrand.kt:NavbarBrandSpacing</ID>
+    <ID>MatchingDeclarationName:ParseSessionCookie.kt:SessionCookieParseResult</ID>
+    <ID>MatchingDeclarationName:ReadApiError.kt:ParsedApiError</ID>
+    <ID>MatchingDeclarationName:ResponsiveNavbar.kt:NavbarPage</ID>
+    <ID>MatchingDeclarationName:RetryExecutor.kt:RetryDecision&lt;out T&gt;</ID>
+    <ID>MatchingDeclarationName:UpstreamLoginService.kt:UpstreamLoginResult</ID>
+    <ID>MatchingDeclarationName:UpstreamRequest.kt:UpstreamClient : UpstreamGatewayAutoCloseable</ID>
+    <ID>NestedBlockDepth:build.gradle.kts:SmokePackagedLauncherTask$@TaskAction fun verify</ID>
+    <ID>NewLineAtEndOfFile:NavbarLink.kt:f95gm.client.ui.navigation.NavbarLink.kt</ID>
+    <ID>RethrowCaughtException:UpstreamRequestCoordinator.kt:UpstreamRequestCoordinator$throw error</ID>
+    <ID>SwallowedException:UpstreamRequestCoordinator.kt:UpstreamRequestCoordinator$error: IOException</ID>
+    <ID>SwallowedException:UpstreamRequestCoordinator.kt:UpstreamRequestCoordinator$error: kotlinx.coroutines.TimeoutCancellationException</ID>
+    <ID>SwallowedException:UpstreamTransport.kt:UpstreamTransport$error: IOException</ID>
+    <ID>ThrowsCount:ConfigureRequestMonitoring.kt:private fun Application.installRequestMonitoringWithPolicy</ID>
+    <ID>ThrowsCount:SingleFlight.kt:SingleFlight$suspend fun run: V</ID>
+    <ID>TooGenericExceptionCaught:ApiRequest.kt:error: Exception</ID>
+    <ID>TooGenericExceptionCaught:ApiResult.kt:error: Exception</ID>
+    <ID>TooGenericExceptionCaught:BoundedTtlCache.kt:BoundedTtlCache$error: Error</ID>
+    <ID>TooGenericExceptionCaught:BoundedTtlCache.kt:BoundedTtlCache$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:ConfigureRequestMonitoring.kt:error: Exception</ID>
+    <ID>TooGenericExceptionCaught:InitDatabase.kt:error: Exception</ID>
+    <ID>TooGenericExceptionCaught:PinnedMediaFetcher.kt:PinnedMediaFetcher$error: RuntimeException</ID>
+    <ID>TooGenericExceptionCaught:RetryExecutor.kt:error: Exception</ID>
+    <ID>TooGenericExceptionCaught:ServerLifecycle.kt:ServerLifecycle$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:ServerShutdownController.kt:ServerShutdownController$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:SingleFlight.kt:SingleFlight$error: Error</ID>
+    <ID>TooGenericExceptionCaught:SingleFlight.kt:SingleFlight$error: Exception</ID>
+  </CurrentIssues>
+</SmellBaseline>

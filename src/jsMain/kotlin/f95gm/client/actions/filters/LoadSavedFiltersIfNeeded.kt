@@ -1,27 +1,27 @@
 package f95gm.client.actions.filters
 
-import f95gm.client.data.api.getJson
-import f95gm.client.data.filters.parseSavedFilters
+import f95gm.client.data.api.apiResult
+import f95gm.client.data.api.apiUserMessage
+import f95gm.client.data.api.ApiFallbacks
 import f95gm.client.model.filters.SavedFiltersState
-import f95gm.client.state.filters.loadedSavedFilters
-import f95gm.client.state.filters.savedFilters
-import f95gm.client.state.filters.savedFiltersLoadJob
-import f95gm.client.state.runtime.scope
-import f95gm.domain.api.F95Api
+import f95gm.client.state.runtime.ClientJobKey
+import f95gm.client.state.runtime.ClientFiltersActionsPort
+import f95gm.client.state.runtime.launchSavedFiltersLoadOperation
 import f95gm.messages.UiMessages
-import kotlinx.coroutines.launch
+import f95gm.client.state.runtime.AsyncState
 
-internal fun loadSavedFiltersIfNeeded() {
-    if (loadedSavedFilters) return
-    loadedSavedFilters = true
-    savedFiltersLoadJob = scope.launch {
-        savedFilters.enqueue { SavedFiltersState(loading = true) }
-        runCatching { parseSavedFilters(getJson(F95Api.FILTERS)) }
+internal fun loadSavedFiltersIfNeeded(runtime: ClientFiltersActionsPort) {
+    if (runtime.filtersLoading.isLoaded()) return
+    runtime.filtersLoading.markLoaded()
+    runtime.launchSavedFiltersLoadOperation {
+        val savedFilters = runtime.savedFilters
+        savedFilters.enqueue { SavedFiltersState(async = AsyncState.Loading) }
+        apiResult { runtime.filtersApi.filters() }
             .onSuccess { items -> savedFilters.enqueue { SavedFiltersState(items = items) } }
             .onFailure { error ->
                 savedFilters.enqueue {
                     SavedFiltersState(
-                        error = error.message ?: UiMessages.app_savedFiltersLoadFailed()
+                        async = AsyncState.Failure(error.apiUserMessage(ApiFallbacks.SavedFilters))
                     )
                 }
             }

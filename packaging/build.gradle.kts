@@ -1,3 +1,5 @@
+
+
 plugins {
     alias(libs.plugins.beryx.runtime)
 }
@@ -19,6 +21,9 @@ val hostOs = System.getProperty("os.name").lowercase()
 val isWindows = hostOs.contains("win")
 val isMacOs = hostOs.contains("mac")
 val isLinux = hostOs.contains("nux")
+check(isWindows || isMacOs || isLinux) {
+    "Unsupported packaging host OS: ${System.getProperty("os.name")}"
+}
 val nativeInstallerType = when {
     isWindows -> "msi"
     isMacOs -> "dmg"
@@ -78,3 +83,34 @@ listOf("jre", "jpackageImage", "jpackage").forEach { taskName ->
         notCompatibleWithConfigurationCache("Beryx Runtime accesses the project during packaging task execution.")
     }
 }
+
+
+val verifyInstallerInputs = tasks.register<f95gm.build.VerifyInstallerInputsTask>("verifyInstallerInputs") {
+    group = "verification"
+    description = "Verifies native installer inputs before invoking jpackage."
+    installerInputs.from(
+        when {
+            isWindows -> iconPath
+            isMacOs -> macIconPath
+            else -> iconPngPath
+        },
+        rootProject.layout.buildDirectory.file("generated/jvmResources/main/static/asset-manifest.json")
+    )
+}
+
+verifyInstallerInputs.configure {
+    dependsOn(rootProject.tasks.named("generateAssetManifest"))
+}
+
+tasks.named("jpackage") { dependsOn(verifyInstallerInputs) }
+tasks.named("check") { dependsOn(verifyInstallerInputs) }
+
+val smokePackagedLauncher = tasks.register<f95gm.build.SmokePackagedLauncherTask>("smokePackagedLauncher") {
+    group = "verification"
+    description = "Verifies that the packaged launcher exists and is executable by the host shell."
+    dependsOn("installDist")
+    launcher.set(layout.buildDirectory.file("install/packaging/bin/${if (isWindows) "packaging.bat" else "packaging"}"))
+    runSmoke.set(providers.gradleProperty("runInstallerSmoke").map { true }.orElse(false))
+}
+
+tasks.named("check") { dependsOn(smokePackagedLauncher) }

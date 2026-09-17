@@ -1,7 +1,7 @@
 package f95gm.server.persistence.filters.alias
 
-import f95gm.server.config.constants.ServerConstants
 import java.text.Normalizer
+import f95gm.server.config.constants.FilterLimits
 
 internal fun filterAlias(name: String): String {
     val normalized = Normalizer.normalize(name.lowercase(), Normalizer.Form.NFKD)
@@ -30,7 +30,7 @@ internal fun filterAlias(name: String): String {
                 // Unmapped letters are omitted so the result remains Latin-only.
             }
         }
-    }.take(ServerConstants.FILTER_ID_LENGTH).trim('-')
+    }.take(FilterLimits.FILTER_ID_LENGTH).trim('-')
 
     return alias.ifBlank { FILTER_ALIAS_FALLBACK }
 }

@@ -1,8 +1,9 @@
 package f95gm.client.actions.detail
 
-import f95gm.client.state.runtime.scope
-import kotlinx.coroutines.launch
+import f95gm.client.state.runtime.ClientDetailActionsPort
+import f95gm.client.state.runtime.launchDetailOperation
+import f95gm.domain.values.F95ThreadId
 
-internal fun retryDetail(threadId: String) {
-    scope.launch { loadDetail(threadId) }
+internal fun retryDetail(runtime: ClientDetailActionsPort, threadId: F95ThreadId) {
+    runtime.launchDetailOperation { loadDetail(runtime, threadId) }
 }

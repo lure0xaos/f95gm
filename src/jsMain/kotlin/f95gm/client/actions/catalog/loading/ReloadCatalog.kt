@@ -1,8 +1,7 @@
 package f95gm.client.actions.catalog.loading
 
-import f95gm.client.state.runtime.scope
-import kotlinx.coroutines.launch
+import f95gm.client.state.runtime.ClientCatalogActionsPort
 
-internal fun reloadCatalog() {
-    scope.launch { loadCatalog() }
+internal fun reloadCatalog(runtime: ClientCatalogActionsPort) {
+    launchCatalogLoad(runtime)
 }

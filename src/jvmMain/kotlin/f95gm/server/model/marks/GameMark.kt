@@ -4,6 +4,7 @@ import f95gm.domain.defaults.F95Defaults
 import f95gm.domain.tracking.GameTrackingState
 import f95gm.domain.values.F95ThreadId
 import f95gm.domain.values.StoredVersion
+import f95gm.server.model.EpochMillis
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -12,5 +13,5 @@ internal data class GameMark(
     val trackingState: GameTrackingState = GameTrackingState.WATCHING,
     val storedVersion: StoredVersion = StoredVersion(F95Defaults.EMPTY),
     val lastSeenUpdateVersion: StoredVersion = StoredVersion(F95Defaults.EMPTY),
-    val updatedAt: Long = 0L
+    val updatedAt: EpochMillis = EpochMillis(0L)
 )

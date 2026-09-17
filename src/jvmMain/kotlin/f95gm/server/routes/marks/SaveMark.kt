@@ -1,69 +1,100 @@
 package f95gm.server.routes.marks
 
-import f95gm.domain.api.F95HttpStatus
-import f95gm.domain.defaults.F95Defaults
-import f95gm.domain.tracking.GameTrackingState
-import f95gm.domain.values.F95ThreadId
-import f95gm.domain.values.StoredVersion
+import f95gm.domain.api.F95ApiErrorCode
 import f95gm.messages.UiMessages
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.config.filters.gameTrackingStates
-import f95gm.server.http.response.jsonMessage
-import f95gm.server.http.response.respond
+import f95gm.server.config.protocol.HttpProtocolConfig
+import f95gm.server.http.request.*
+import f95gm.server.routes.ports.beginIdempotentMutation
+import f95gm.server.http.response.*
 import f95gm.server.model.marks.GameMark
-import f95gm.server.model.marks.MarkRequest
-import f95gm.server.persistence.marks.loadMarks
-import f95gm.server.persistence.marks.marksJson
-import f95gm.server.persistence.marks.storeMark
+import f95gm.server.application.port.CachedResponse
+import f95gm.domain.api.F95MarkRequest
+import f95gm.server.model.ConditionalWriteResult
+import f95gm.server.model.EpochMillis
+import f95gm.server.http.response.marksJson
+import f95gm.server.routes.marks.live.invalidateLiveMark
 import f95gm.server.routes.marks.live.loadLiveMarks
-import f95gm.server.routes.session.browserSession
-import f95gm.server.state.runtime.upstreamJson
+import f95gm.server.routes.session.requireBrowserSession
+import f95gm.server.application.IdempotencyRegistry
+import f95gm.server.routes.marks.markDependencies
+import f95gm.server.routes.marks.live.MarkRouteDependencies
 import io.ktor.server.application.*
-import io.ktor.server.request.*
+import f95gm.domain.api.ApiStatusCode
+import f95gm.server.config.constants.HttpStatusCatalog
 
 internal suspend fun saveMark(call: ApplicationCall) {
-    val session = browserSession(call)?.second
-    if (session == null) {
-        respond(call, ServerConstants.STATUS_UNAUTHORIZED, jsonMessage(UiMessages.server_signInToMark()))
-        return
-    }
-    val threadId = call.parameters["threadId"]?.toLongOrNull()?.takeIf { it > 0 }?.toString()
+    val session = call.requireBrowserSession(UiMessages.server_signInToMark()) ?: return
+    val dependencies = call.markDependencies
+    val idempotencyKey = validIdempotencyKey(call.request.headers[HttpProtocolConfig.IDEMPOTENCY_KEY_HEADER])
+    val mutationKey = idempotencyKey?.value?.let { "mark:${session.accountKey.value}:$it" }
+    val threadId = call.positiveThreadIdParameter("threadId")
     if (threadId == null) {
-        respond(call, ServerConstants.STATUS_BAD_REQUEST, jsonMessage(UiMessages.server_invalidGameId()))
+        respondFailure(
+            call,
+            badRequestResponse(ApiFailure(
+                UiMessages.server_invalidGameId(),
+                ServerMessageKey.INVALID_GAME_ID,
+                F95ApiErrorCode.INVALID_INPUT,
+                ApiFailureDetails.field("threadId")
+            ))
+        )
         return
     }
 
-    val body = call.receiveText()
-    val request = runCatching { upstreamJson.decodeFromString<MarkRequest>(body) }.getOrNull()
-    val trackingState = request?.trackingState?.wireValue?.takeIf { it in gameTrackingStates }
-    if (trackingState == null) {
-        respond(call, ServerConstants.STATUS_BAD_REQUEST, jsonMessage(UiMessages.server_invalidGameTrackingState()))
+    val received = call.receiveMutationRequest<F95MarkRequest>(dependencies.maxRequestBodyBytes.value) ?: return
+    val body = received.body
+    val request = received.request
+    if (!request.hasValidTrackingState()) {
+        respondFailure(
+            call,
+            badRequestResponse(ApiFailure(
+                UiMessages.server_invalidGameTrackingState(),
+                ServerMessageKey.INVALID_TRACKING_STATE,
+                F95ApiErrorCode.INVALID_INPUT,
+                ApiFailureDetails.field("trackingState")
+            ))
+        )
         return
     }
-    val existing = loadMarks(session.accountKey).firstOrNull { it.threadId.value == threadId }
-    val requestedStoredVersion = request.storedVersion.value.trim().take(ServerConstants.MAX_TEXT_LENGTH)
-        .ifBlank { existing?.storedVersion?.value ?: F95Defaults.UNKNOWN_VERSION }
-    val requestedMark = GameMark(
-        threadId = F95ThreadId(threadId),
-        trackingState = GameTrackingState.fromWire(trackingState) ?: return,
-        storedVersion = if (request.acknowledge) {
-            StoredVersion(requestedStoredVersion)
-        } else {
-            existing?.storedVersion ?: StoredVersion(requestedStoredVersion)
-        },
-        lastSeenUpdateVersion = existing?.lastSeenUpdateVersion ?: StoredVersion(F95Defaults.EMPTY),
-        updatedAt = System.currentTimeMillis()
+    val lease = call.beginIdempotentMutation(mutationKey, "$threadId\n$body") ?: return
+    lease.use {
+        val existing = dependencies.applicationServices.marks.load(session.accountKey)
+            .firstOrNull { it.threadId == threadId }
+    val requestedMark = dependencies.applicationServices.marks.createMark(
+        threadId, request, existing, dependencies.clock.epochMillis()
     )
-    val live = loadLiveMarks(listOf(requestedMark), session)
-    val effectiveStoredVersion = if (existing == null && !request.acknowledge) {
+        val live = loadLiveMarks(dependencies, listOf(requestedMark), session)
+    val effectiveStoredVersion = effectiveStoredVersion(
+        existing,
+        requestedMark,
+        request.acknowledge,
         live[threadId]?.version?.value
-            ?.takeIf { it.isNotBlank() && !it.equals(F95Defaults.UNKNOWN_VERSION, ignoreCase = true) }
-            ?.let(::StoredVersion)
-            ?: requestedMark.storedVersion
-    } else {
-        requestedMark.storedVersion
-    }
+    )
     val mark = requestedMark.copy(storedVersion = effectiveStoredVersion)
-    storeMark(session.accountKey, mark)
-    respond(call, F95HttpStatus.SUCCESS_MIN, marksJson(listOf(mark), live))
+        val writeResult = dependencies.applicationServices.marks.storeAtomically(
+                session.accountKey,
+                mark,
+                request.expectedUpdatedAt?.value?.let(::EpochMillis)
+            )
+        if (writeResult is ConditionalWriteResult.Conflict) {
+            it.release()
+            val failure = conflictResponse(
+                MutationResponsePolicy.MARK, writeResult.expectedUpdatedAt, writeResult.actualUpdatedAt
+            )
+            respondFailure(call, failure)
+            return
+        }
+        invalidateLiveMark(dependencies, threadId)
+        val responseBody = marksJson(listOf(mark), live)
+        it.complete(
+            CachedResponse(
+                ApiStatusCode(HttpStatusCatalog.OK.value),
+                responseBody,
+                null
+            )
+        )
+        respond(call, HttpStatusCatalog.OK, responseBody)
+    }
 }
+
+

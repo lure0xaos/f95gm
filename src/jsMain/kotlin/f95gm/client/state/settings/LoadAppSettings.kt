@@ -1,20 +1,16 @@
 package f95gm.client.state.settings
 
 import f95gm.client.model.settings.*
-import kotlinx.browser.window
+import f95gm.client.state.runtime.BrowserStorage
 
-internal fun loadAppSettings(): AppSettingsState {
-    return runCatching {
-        val storage = window.localStorage
-        AppSettingsState(
-            theme = AppTheme.fromValue(storage.getItem(SettingsStorageKeys.THEME)),
-            lazyLoadImages = storage.getItem(SettingsStorageKeys.LAZY_LOAD_IMAGES)?.equals("true", ignoreCase = true)
-                ?: true,
-            updateCheckInterval = UpdateCheckInterval.fromMillis(
-                storage.getItem(SettingsStorageKeys.UPDATE_CHECK_INTERVAL)?.toLongOrNull()
-            ),
-            pageSize = PageSize.fromValue(storage.getItem(SettingsStorageKeys.PAGE_SIZE)?.toIntOrNull()),
-            cardSize = CardSize.fromValue(storage.getItem(SettingsStorageKeys.CARD_SIZE))
-        )
-    }.getOrDefault(AppSettingsState())
+internal fun loadAppSettings(storage: BrowserStorage): AppSettingsState {
+    return AppSettingsState(
+        theme = SettingsStorageCodec.decodeTheme(storage.readOrNull(SettingsStorageKeys.THEME)),
+        lazyLoadImages = SettingsStorageCodec.decodeBoolean(storage.readOrNull(SettingsStorageKeys.LAZY_LOAD_IMAGES), true),
+        updateCheckInterval = SettingsStorageCodec.decodeUpdateCheckInterval(
+            storage.readOrNull(SettingsStorageKeys.UPDATE_CHECK_INTERVAL)
+        ),
+        pageSize = SettingsStorageCodec.decodePageSize(storage.readOrNull(SettingsStorageKeys.PAGE_SIZE)),
+        cardSize = SettingsStorageCodec.decodeCardSize(storage.readOrNull(SettingsStorageKeys.CARD_SIZE))
+    )
 }

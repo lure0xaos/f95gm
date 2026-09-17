@@ -8,10 +8,11 @@ import f95gm.domain.filters.F95TagType
 import f95gm.server.config.filters.filterCategories
 import f95gm.server.config.filters.filterSorts
 import f95gm.server.model.filters.SavedFilter
+import f95gm.server.model.ParseResult
 
-internal fun parseSavedFilter(value: SavedFilter): SavedFilter? {
-    if (value.name.value.isBlank()) return null
-    return value.copy(
+internal fun parseSavedFilterResult(value: SavedFilter): ParseResult<SavedFilter> {
+    if (value.name.value.isBlank()) return ParseResult.Invalid("Saved filter name must not be blank")
+    return ParseResult.Success(value.copy(
         category = value.category.takeIf { it.wireValue in filterCategories } ?: F95Category.GAMES,
         sort = value.sort.takeIf { it.wireValue in filterSorts } ?: F95Sort.DATE,
         searchMode = value.searchMode.takeIf { it == F95SearchMode.CREATOR } ?: F95SearchMode.TITLE,
@@ -21,5 +22,5 @@ internal fun parseSavedFilter(value: SavedFilter): SavedFilter? {
         excludedPrefixes = sanitizeSavedFilterOptions(value.excludedPrefixes),
         tagType = value.tagType.takeIf { it == F95TagType.AND } ?: F95TagType.OR,
         dateLimit = value.dateLimit.coerceIn(F95Defaults.ANY_DATE, F95Defaults.MAX_DATE_DAYS)
-    )
+    ))
 }

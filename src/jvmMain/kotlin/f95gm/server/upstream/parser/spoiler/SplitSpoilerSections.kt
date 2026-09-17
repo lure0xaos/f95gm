@@ -2,22 +2,27 @@ package f95gm.server.upstream.parser.spoiler
 
 import f95gm.domain.values.F95Html
 import f95gm.domain.values.F95OptionName
-import f95gm.server.config.upstream.upstream
 import f95gm.server.model.detail.DetailSection
-import f95gm.server.upstream.parser.extractNestedSections
-import f95gm.server.upstream.parser.htmlText
+import f95gm.server.upstream.parser.shared.extractNestedSections
+import f95gm.server.upstream.parser.shared.HtmlBaseUrl
+import f95gm.server.upstream.parser.shared.htmlText
+import f95gm.server.upstream.parser.shared.spoilerHeading
 import org.jsoup.Jsoup
 
-internal fun splitSpoilerSections(section: DetailSection, discardNonSpoilerContent: Boolean): List<DetailSection> {
-    val body = Jsoup.parseBodyFragment(section.html.value, upstream).body()
-    val extractedSections = extractNestedSections(body)
+internal fun splitSpoilerSections(
+    section: DetailSection,
+    contentMode: SpoilerContentMode,
+    baseUrl: HtmlBaseUrl
+): List<DetailSection> {
+    val body = Jsoup.parseBodyFragment(section.html.value, baseUrl.value).body()
+    val extractedSections = extractNestedSections(body, baseUrl)
     val spoilers = body.select("div.bbCodeSpoiler").filter { spoiler ->
         spoiler.parents().none { it.hasClass("bbCodeSpoiler") }
     }
     if (spoilers.isEmpty()) {
         val remainingHtml = body.html().trim()
         val remainingSection = section.copy(html = F95Html(remainingHtml))
-        return listOfNotNull(remainingSection.takeIf { htmlText(remainingHtml).isNotBlank() }) + extractedSections
+        return listOfNotNull(remainingSection.takeIf { htmlText(remainingHtml, baseUrl).isNotBlank() }) + extractedSections
     }
 
     val elements = body.allElements
@@ -31,12 +36,12 @@ internal fun splitSpoilerSections(section: DetailSection, discardNonSpoilerConte
     }
 
     val result = mutableListOf<DetailSection>()
-    if (!discardNonSpoilerContent) {
+    if (contentMode == SpoilerContentMode.KEEP_NON_SPOILER_CONTENT) {
         val remaining = body.clone()
         remaining.select("div.bbCodeSpoiler").remove()
         remaining.select("b").filter { spoilerHeading(it) != null }.forEach { it.remove() }
         val remainingHtml = remaining.html().trim()
-        if (remainingHtml.isNotBlank() && htmlText(remainingHtml).isNotBlank()) {
+        if (remainingHtml.isNotBlank() && htmlText(remainingHtml, baseUrl).isNotBlank()) {
             result += section.copy(html = F95Html(remainingHtml))
         }
     }

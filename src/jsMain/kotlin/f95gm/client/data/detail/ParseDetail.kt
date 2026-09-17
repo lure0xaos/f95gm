@@ -1,33 +1,42 @@
 package f95gm.client.data.detail
 
 import f95gm.client.data.catalog.localizedDetailLabel
-import f95gm.client.data.json.string
+import f95gm.client.data.api.DetailPayload
+import f95gm.client.data.api.PayloadParseResult
+import f95gm.client.data.api.ParseFailureReason
+import f95gm.client.data.api.parsePayload
+import f95gm.client.data.api.PayloadParseException
+import f95gm.client.data.api.PayloadPolicies
+import f95gm.client.data.api.toValues
+import f95gm.client.model.runtime.EndpointId
+import f95gm.client.state.runtime.clientJson
 import f95gm.client.model.detail.DetailMeta
 import f95gm.client.model.detail.DetailSection
 import f95gm.client.model.detail.DetailState
 import f95gm.domain.values.*
 import f95gm.messages.UiMessages
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.decodeFromString
 
-internal fun parseDetail(payload: String): DetailState {
-    val item = Json.parseToJsonElement(payload).jsonObject
-    return DetailState(
-        threadId = F95ThreadId(item.string("threadId")),
-        title = F95GameTitle(item.string("title", UiMessages.app_untitledItem())),
-        creator = F95DeveloperName(item.string("creator")),
-        date = F95DateLabel(item.string("date")),
-        cover = F95CoverUrl(item.string("cover")),
-        meta = item["meta"]?.jsonArray?.map { meta ->
-            val value = meta.jsonObject
-            DetailMeta(F95OptionName(localizedDetailLabel(value.string("label"))), F95OptionName(value.string("value")))
-        }.orEmpty(),
-        overviewHtml = F95Html(item.string("overviewHtml")),
-        sections = item["sections"]?.jsonArray?.map { section ->
-            val value = section.jsonObject
-            DetailSection(F95OptionName(value.string("title")), F95Html(value.string("html")))
-        }.orEmpty(),
-        bodyHtml = F95Html(item.string("bodyHtml"))
+internal fun parseDetail(payload: String): DetailState = when (val result = parseDetailResult(payload)) {
+    is PayloadParseResult.Success -> result.value
+    is PayloadParseResult.Failure -> throw PayloadParseException(result.reason, "Detail payload is invalid", endpoint = EndpointId("detail"))
+}
+
+internal fun parseDetailResult(payload: String): PayloadParseResult<DetailState> = parsePayload<DetailPayload, DetailState>(payload, policy = PayloadPolicies.Detail) { value ->
+    value.toValues().let { typed -> DetailState(
+        threadId = F95ThreadId(typed.threadId),
+        title = F95GameTitle(typed.title.ifBlank { UiMessages.app_untitledItem() }),
+        creator = F95DeveloperName(typed.creator),
+        date = F95DateLabel(typed.date),
+        cover = F95CoverUrl(typed.cover),
+        meta = typed.meta.map { item ->
+            DetailMeta(F95OptionName(localizedDetailLabel(item.label)), F95OptionName(item.value))
+        },
+        overviewHtml = F95Html(typed.overviewHtml),
+        sections = typed.sections.map { section ->
+            DetailSection(F95OptionName(section.title), F95Html(section.html))
+        },
+        bodyHtml = F95Html(typed.bodyHtml)
     )
+    }
 }

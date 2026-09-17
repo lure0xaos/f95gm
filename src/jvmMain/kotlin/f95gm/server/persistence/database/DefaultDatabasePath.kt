@@ -1,6 +1,4 @@
 package f95gm.server.persistence.database
 
-import java.nio.file.Path
-
-internal fun defaultDatabasePath(): String =
-    Path.of(System.getProperty("user.home"), "F95GM", "f95gm").toString()
+internal fun defaultDatabasePath(userHome: String): String =
+    kotlin.io.path.Path(userHome, "F95GM", "f95gm").toString()

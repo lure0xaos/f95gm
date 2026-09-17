@@ -19,5 +19,5 @@ internal data class MarkedGame(
     val storedVersion: StoredVersion,
     val latestVersion: F95GameVersion,
     val updateAvailable: Boolean,
-    val updatedAt: Long
+    val updatedAt: F95EpochMillis
 )

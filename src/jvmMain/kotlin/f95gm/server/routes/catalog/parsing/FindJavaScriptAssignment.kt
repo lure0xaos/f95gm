@@ -34,7 +34,9 @@ internal fun findJavaScriptAssignment(script: String, variable: String): Int? {
             if (hasWindowPrefix || hasDeclaration || isStandalone) {
                 var equalsIndex = variableEnd
                 while (equalsIndex < script.length && script[equalsIndex].isWhitespace()) equalsIndex++
-                if (equalsIndex < script.length && script[equalsIndex] == '=') return equalsIndex + 1
+                if (equalsIndex < script.length && script[equalsIndex] == '=' && script.getOrNull(equalsIndex + 1) != '=') {
+                    return equalsIndex + 1
+                }
             }
         }
         searchFrom = variableStart + 1

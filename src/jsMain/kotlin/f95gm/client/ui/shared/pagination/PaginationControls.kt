@@ -50,7 +50,7 @@ internal fun <T> RenderContext.paginationControls(
 
                 (firstVisiblePage..lastVisiblePage).forEach { page ->
                     if (page == state.page) {
-                        if (state.editingPage) {
+                        if (state.editingPage == PageEditMode.EDITING) {
                             input("page-input $textFieldClass text-center fw-semibold") {
                                 type("number")
                                 attr("min", F95Defaults.FIRST_PAGE.toString())
@@ -58,7 +58,6 @@ internal fun <T> RenderContext.paginationControls(
                                 attr("inputmode", "numeric")
                                 attr("aria-label", UiMessages.app_pageOf(state.page, state.totalPages))
                                 attr("autofocus", "true")
-                                attr("style", "width: 4rem")
                                 value(flowOf(state.pageInput))
                                 inputs.values() handledBy onPageInput
                                 keyupsIf { key == "Enter" } handledBy {

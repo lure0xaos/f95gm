@@ -1,20 +1,19 @@
 package f95gm.client.ui.catalog.saved
 
 import dev.fritz2.core.*
-import f95gm.client.actions.filters.deleteSavedFilter
-import f95gm.client.actions.filters.retrySavedFilters
-import f95gm.client.actions.filters.saveCurrentFilter
-import f95gm.client.actions.filters.updateSavedFilterName
-import f95gm.client.state.filters.savedFilterName
-import f95gm.client.state.filters.savedFilters
 import f95gm.client.ui.shared.navigation.dangerNavigationButtonClass
 import f95gm.client.ui.shared.navigation.successNavigationButtonClass
 import f95gm.client.ui.shared.textFieldClass
+import f95gm.client.state.runtime.ClientCatalogUiPort
+import f95gm.client.model.filters.loading
+import f95gm.client.model.filters.error
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.savedFilterManager() {
+internal fun RenderContext.savedFilterManager(runtime: ClientCatalogUiPort) {
+    val savedFilters = runtime.savedFiltersView
+    val savedFilterName = runtime.savedFilterNameView
     div("saved-filters border-top pt-3 mt-4") {
         div("saved-heading d-flex flex-wrap align-items-baseline justify-content-between gap-2") {
             div("saved-title text-uppercase text-primary small fw-semibold") { +UiMessages.app_savedQuickLinks() }
@@ -25,13 +24,13 @@ internal fun RenderContext.savedFilterManager() {
                 type("text")
                 placeholder(UiMessages.app_filterNamePlaceholder())
                 value(savedFilterName.data)
-                inputs.values() handledBy { updateSavedFilterName(it) }
+                inputs.values() handledBy { runtime.filtersCommands.updateSavedFilterName(it) }
             }
             button("saved-add $successNavigationButtonClass") {
                 type("button")
                 span("bi bi-link-45deg me-1") {}
                 +UiMessages.app_saveQuickLink()
-                clicks handledBy { saveCurrentFilter() }
+                clicks handledBy { runtime.filtersCommands.saveCurrentFilter() }
             }
         }
         savedFilters.data.map { it.items to it.loading }.distinctUntilChanged().render { (items, loading) ->
@@ -52,7 +51,7 @@ internal fun RenderContext.savedFilterManager() {
                                         span("bi bi-trash") {}
                                         attr("aria-label", UiMessages.app_remove())
                                         title(UiMessages.app_remove())
-                                        clicks handledBy { deleteSavedFilter(filter.id.value) }
+                                        clicks handledBy { runtime.filtersCommands.deleteSavedFilter(filter.id) }
                                     }
                                 }
                             }
@@ -68,7 +67,7 @@ internal fun RenderContext.savedFilterManager() {
                     button("btn btn-sm btn-outline-danger") {
                         type("button")
                         +UiMessages.app_retry()
-                        clicks handledBy { retrySavedFilters() }
+                        clicks handledBy { runtime.filtersCommands.retrySavedFilters() }
                     }
                 }
             }

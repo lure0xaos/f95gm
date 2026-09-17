@@ -1,8 +1,8 @@
 package f95gm.client.actions.filters
 
-import f95gm.client.state.filters.loadedSavedFilters
+import f95gm.client.state.runtime.ClientFiltersActionsPort
 
-internal fun retrySavedFilters() {
-    loadedSavedFilters = false
-    loadSavedFiltersIfNeeded()
+internal fun retrySavedFilters(runtime: ClientFiltersActionsPort) {
+    runtime.filtersLoading.clearLoaded()
+    loadSavedFiltersIfNeeded(runtime)
 }

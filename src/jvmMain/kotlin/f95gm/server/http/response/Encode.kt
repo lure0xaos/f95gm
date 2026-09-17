@@ -1,5 +1,5 @@
 package f95gm.server.http.response
 
-import java.net.URLEncoder
+import f95gm.domain.http.percentEncode
 
-internal fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8)
+internal fun encode(value: String): String = percentEncode(value, spaceAsPlus = true)

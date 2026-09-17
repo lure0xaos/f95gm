@@ -1,16 +1,14 @@
 package f95gm.client.actions.auth
 
-import f95gm.client.data.api.getJson
-import f95gm.client.model.auth.SessionState
-import f95gm.client.state.session.session
-import f95gm.domain.api.F95Api
+import f95gm.client.data.api.apiResult
+import f95gm.client.state.runtime.ClientAuthActionsPort
 
-internal suspend fun restoreSession() {
-    runCatching { getJson(F95Api.SESSION) }
-        .onSuccess {
-            session.enqueue { SessionState(authenticated = true) }
+internal suspend fun restoreSession(runtime: ClientAuthActionsPort) {
+    apiResult { runtime.sessionApi.sessionTyped().body }
+        .onSuccess { response ->
+            AuthEffects.sessionRestored(runtime, response.ok)
         }
         .onFailure {
-            session.enqueue { SessionState() }
+            AuthEffects.sessionRestored(runtime, false)
         }
 }

@@ -1,0 +1,26 @@
+config:
+  validation: true
+  warningsAsErrors: false
+
+complexity:
+  LongMethod:
+    active: false
+  LongParameterList:
+    active: false
+  TooManyFunctions:
+    active: false
+
+naming:
+  PackageNaming:
+    packagePattern: '^f95gm(\.[a-z][A-Za-z0-9]*)*$'
+  TopLevelPropertyNaming:
+    active: false
+style:
+  MagicNumber:
+    active: false
+  ReturnCount:
+    active: false
+  MaxLineLength:
+    active: false
+  WildcardImport:
+    active: false

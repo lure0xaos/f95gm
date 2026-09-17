@@ -1,10 +1,5 @@
 package f95gm.client.routing.navigation
 
-import f95gm.client.routing.pages.Pages
-import f95gm.client.routing.pages.routePage
-import f95gm.client.routing.pages.routeThreadId
+import f95gm.domain.values.F95ThreadId
 
-internal fun myGamesDetailRoute(threadId: String): Route = mapOf(
-    routePage to Pages.MY_GAMES_DETAIL,
-    routeThreadId to threadId
-)
+internal fun myGamesDetailRoute(threadId: F95ThreadId): TypedRoute = TypedRoute.MyGamesDetail(threadId)

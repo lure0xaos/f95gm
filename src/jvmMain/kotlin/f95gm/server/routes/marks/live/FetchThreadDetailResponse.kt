@@ -1,23 +1,33 @@
 package f95gm.server.routes.marks.live
 
-import f95gm.domain.api.F95HttpStatus
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.config.upstream.latestPage
+import f95gm.domain.values.F95ThreadId
+import f95gm.server.http.response.isSuccessful
 import f95gm.server.model.auth.UpstreamSession
-import f95gm.server.upstream.request.upstreamRequest
+import f95gm.server.model.ParseResult
+import f95gm.server.routes.marks.live.MarkRouteDependencies
+import f95gm.server.config.protocol.UpstreamProtocolConfig
+import f95gm.server.upstream.request.*
 import io.ktor.http.*
 
-internal suspend fun fetchThreadDetailResponse(threadId: String, session: UpstreamSession): String? {
-    val headers = mapOf(
-        HttpHeaders.Referrer to latestPage,
-        HttpHeaders.Accept to "text/html,application/xhtml+xml"
+internal suspend fun fetchThreadDetailResponse(
+    context: MarkRouteDependencies,
+    threadId: F95ThreadId,
+    session: UpstreamSession
+): ParseResult<String> {
+    val headers = UpstreamHeaders.of(
+        UpstreamHeader(HttpHeaders.Referrer, context.upstreamEndpoints.latestPage),
+        UpstreamHeader(HttpHeaders.Accept, UpstreamProtocolConfig.ACCEPT_HTML_DOCUMENT)
     )
-    val first = upstreamRequest("GET", "/threads/$threadId/", session, headers = headers)
-    val result =
-        if (first.status in ServerConstants.REDIRECT_STATUS_MIN..ServerConstants.REDIRECT_STATUS_MAX && first.location != null) {
-            upstreamRequest("GET", first.location, session, headers = headers)
-        } else {
-            first
-        }
-    return result.body.takeIf { result.status in F95HttpStatus.SUCCESS_MIN..F95HttpStatus.SUCCESS_MAX }
+    val first = context.upstream.request(
+        UpstreamRequests.get(UpstreamPaths.thread(threadId), session, headers, UpstreamEndpointPolicy.DETAIL)
+    )
+    val result = followUpstreamRedirects(
+        context.upstream,
+        first,
+        session,
+        headers,
+        UpstreamEndpointPolicy.DETAIL
+    )
+    return if (result.status.isSuccessful) ParseResult.Success(result.body)
+    else ParseResult.Invalid("Upstream detail request failed: ${result.status}")
 }

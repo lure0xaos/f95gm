@@ -1,48 +1,67 @@
 package f95gm.server.routes.item
 
-import f95gm.domain.api.F95HttpStatus
 import f95gm.messages.UiMessages
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.config.upstream.mediaHosts
-import f95gm.server.config.upstream.upstream
-import f95gm.server.config.upstream.upstreamUserAgent
-import f95gm.server.http.response.jsonMessage
-import f95gm.server.http.response.respond
-import f95gm.server.routes.session.browserSession
-import f95gm.server.state.runtime.client
-import io.ktor.client.call.*
-import io.ktor.client.request.*
+import f95gm.server.application.media.MediaFetchResult
+import f95gm.server.http.response.ServerMessageKey
+import f95gm.server.http.response.respondApiFailure
+import f95gm.server.http.response.respondFailure
+import f95gm.server.routes.session.requireBrowserSession
+import f95gm.server.routes.item.mediaDependencies
+import f95gm.server.model.media.MediaUrl
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import java.net.URI
+import io.ktor.utils.io.*
+import f95gm.domain.api.F95ApiQueryParameters
+import f95gm.server.http.request.get
+import f95gm.server.config.constants.HttpStatusCatalog
 
 internal suspend fun media(call: ApplicationCall) {
-    val session = browserSession(call)?.second
-    if (session == null) {
-        respond(call, ServerConstants.STATUS_UNAUTHORIZED, jsonMessage(UiMessages.server_signInToMedia()))
+    val session = call.requireBrowserSession(UiMessages.server_signInToMedia()) ?: return
+    val dependencies = call.mediaDependencies
+    val result = dependencies.mediaService.fetch(
+        call.request.queryParameters[F95ApiQueryParameters.URL]?.let(::MediaUrl), session.cookieSnapshot().header
+    )
+    val response = when (result) {
+        is MediaFetchResult.NotAllowed -> {
+            respondApiFailure(
+                call, HttpStatusCatalog.BAD_REQUEST, UiMessages.server_mediaUrlNotAllowed(),
+                ServerMessageKey.MEDIA_URL_NOT_ALLOWED
+            )
+            return
+        }
+        is MediaFetchResult.Fetched -> result.response
+    }
+    val policy = dependencies.mediaResourcePolicy
+    val decision = policy.evaluate(response)
+    if (decision != MediaResponseDecision.ACCEPT) {
+        response.close()
+        val failure = when (decision) {
+            MediaResponseDecision.UPSTREAM_STATUS -> mediaStatusFailure(response.statusCode.value)
+            MediaResponseDecision.TOO_LARGE -> mediaTooLargeFailure()
+            MediaResponseDecision.INVALID_CONTENT_TYPE -> mediaTypeFailure()
+            MediaResponseDecision.ACCEPT -> error("Accepted media cannot be rejected")
+        }
+        respondFailure(call, failure)
         return
     }
-    val rawUrl = call.request.queryParameters["url"]
-    val uri = runCatching { rawUrl?.let(::URI) }.getOrNull()
-    if (uri == null || uri.scheme != "https" || uri.host !in mediaHosts) {
-        respond(call, ServerConstants.STATUS_BAD_REQUEST, jsonMessage(UiMessages.server_mediaUrlNotAllowed()))
-        return
+    call.response.headers.append(HttpHeaders.ContentDisposition, mediaContentDisposition(response.contentType))
+    call.respond(object : OutgoingContent.WriteChannelContent() {
+        override val contentType = response.contentType
+        override val contentLength = response.contentLength?.value
+        override suspend fun writeTo(channel: ByteWriteChannel) {
+            streamMediaResponse(response, policy, dependencies.ioDispatcher) { buffer, read ->
+                channel.writeFully(buffer, 0, read)
+            }
+        }
+    })
+}
+
+internal fun mediaContentDisposition(contentType: ContentType?): String =
+    if (contentType?.contentType == "image" && contentType.contentSubtype.equals("svg+xml", ignoreCase = true)) {
+        "attachment"
+    } else {
+        "inline"
     }
 
-    val response = client.request(uri.toString()) {
-        header(HttpHeaders.UserAgent, upstreamUserAgent)
-        header(HttpHeaders.Cookie, session.header())
-        header(HttpHeaders.Referrer, "$upstream/")
-        header(HttpHeaders.Accept, "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
-    }
-    if (response.status.value !in F95HttpStatus.SUCCESS_MIN..F95HttpStatus.SUCCESS_MAX) {
-        respond(call, response.status.value, jsonMessage(UiMessages.server_mediaStatus(response.status.value)))
-        return
-    }
-    call.respondBytes(
-        bytes = response.body<ByteArray>(),
-        contentType = response.headers[HttpHeaders.ContentType]?.let(ContentType::parse),
-        status = response.status
-    )
-}

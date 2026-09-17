@@ -6,6 +6,7 @@ import f95gm.domain.filters.F95Category
 import f95gm.domain.filters.F95SearchMode
 import f95gm.domain.filters.F95Sort
 import f95gm.domain.filters.F95TagType
+import f95gm.domain.values.F95EpochMillis
 import f95gm.domain.values.F95FilterId
 import f95gm.domain.values.F95OptionName
 
@@ -23,5 +24,5 @@ internal data class SavedFilter(
     val excludedPrefixes: List<PrefixOption>,
     val tagType: F95TagType,
     val dateLimit: Int,
-    val updatedAt: Long
+    val updatedAt: F95EpochMillis
 )

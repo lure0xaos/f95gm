@@ -1,43 +1,30 @@
 package f95gm.client.actions.auth
 
-import f95gm.client.data.api.postJson
-import f95gm.client.model.auth.LoginRequestBody
+import f95gm.client.data.api.apiResult
+import f95gm.client.data.api.apiUserMessage
+import f95gm.client.data.api.ApiFallbacks
 import f95gm.client.model.auth.SessionState
-import f95gm.client.routing.navigation.myGamesRoute
-import f95gm.client.routing.navigation.router
-import f95gm.client.state.catalog.catalog
-import f95gm.client.state.runtime.clientJson
-import f95gm.client.state.runtime.scope
-import f95gm.client.state.session.credentials
-import f95gm.client.state.session.session
-import f95gm.domain.api.F95Api
-import f95gm.domain.defaults.F95Defaults
+import f95gm.client.state.runtime.ClientAuthActionsPort
+import f95gm.client.state.runtime.launchAuthenticationOperation
+import f95gm.domain.api.LoginRequestContract
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import f95gm.client.state.runtime.AsyncState
 
-internal fun signIn() {
-    scope.launch {
-        val values = credentials.data.first()
+internal fun signIn(runtime: ClientAuthActionsPort) {
+    runtime.launchAuthenticationOperation {
+        val values = runtime.credentials.data.first()
         if (values.login.isBlank() || values.password.isBlank()) {
-            session.enqueue { it.copy(error = UiMessages.app_enterCredentials()) }
-            return@launch
+            runtime.session.enqueue { it.copy(async = AsyncState.Failure(UiMessages.app_enterCredentials())) }
+            return@launchAuthenticationOperation
         }
-        session.enqueue { SessionState(busy = true) }
-        runCatching {
-            postJson(F95Api.LOGIN, clientJson.encodeToString(LoginRequestBody(values.login, values.password)))
+        runtime.session.enqueue { SessionState(async = AsyncState.Loading) }
+        apiResult {
+            runtime.sessionApi.loginTyped(LoginRequestContract(values.login, values.password)).body
         }.onSuccess {
-            session.enqueue { SessionState(authenticated = true) }
-            catalog.enqueue {
-                it.copy(
-                    page = F95Defaults.FIRST_PAGE,
-                    search = F95Defaults.EMPTY,
-                    error = F95Defaults.EMPTY
-                )
-            }
-            router.navTo(myGamesRoute)
+            AuthEffects.authenticated(runtime)
         }.onFailure { error ->
-            session.enqueue { SessionState(error = error.message ?: UiMessages.app_signInFailed()) }
+            AuthEffects.failed(runtime, error.apiUserMessage(ApiFallbacks.SignIn))
         }
     }
 }

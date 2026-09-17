@@ -2,24 +2,22 @@ package f95gm.client.ui.pages.latestupdates
 
 import dev.fritz2.core.RenderContext
 import dev.fritz2.core.type
-import f95gm.client.actions.catalog.loading.loadCatalogIfNeeded
-import f95gm.client.actions.catalog.loading.loadFilterOptionsIfNeeded
-import f95gm.client.actions.catalog.loading.retryCatalog
-import f95gm.client.actions.filters.applyFilterRouteIfNeeded
-import f95gm.client.actions.filters.loadSavedFiltersIfNeeded
-import f95gm.client.state.catalog.catalog
-import f95gm.client.state.settings.appSettings
 import f95gm.client.ui.catalog.gameCard
 import f95gm.client.ui.catalog.pagination.pagination
 import f95gm.client.ui.catalog.toolbar.catalogToolbar
 import f95gm.client.ui.shared.loading.pageLoadingOverlay
+import f95gm.client.state.runtime.ClientCatalogPagePort
+import f95gm.client.model.catalog.error
+import f95gm.client.model.catalog.loading
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.latestUpdatesPage(filterId: String? = null) {
+internal fun RenderContext.latestUpdatesPage(runtime: ClientCatalogPagePort, filterId: String? = null) {
+    val catalog = runtime.catalogView
+    val appSettings = runtime.appSettingsView
     div("catalog-page") {
-        catalogToolbar()
+            catalogToolbar(runtime)
         div("feed-status mt-3") {
             catalog.data.map { it.error }.distinctUntilChanged().render { error ->
                 if (error.isNotBlank()) {
@@ -28,13 +26,13 @@ internal fun RenderContext.latestUpdatesPage(filterId: String? = null) {
                         button("btn btn-sm btn-outline-danger") {
                             type("button")
                             +UiMessages.app_retry()
-                            clicks handledBy { retryCatalog() }
+                            clicks handledBy { runtime.catalogCommands.retryCatalog() }
                         }
                     }
                 }
             }
         }
-        pagination()
+        pagination(runtime)
         div("feed w-100") {
             catalog.data.map { it.items }.distinctUntilChanged().render { items ->
                 appSettings.data.map { it.cardSize.gridClass }.render { classNames ->
@@ -48,7 +46,7 @@ internal fun RenderContext.latestUpdatesPage(filterId: String? = null) {
                                 }
                             }
                         } else {
-                            items.forEach { gameCard(it) }
+                            items.forEach { gameCard(runtime, it) }
                         }
                     }
                 }
@@ -57,10 +55,10 @@ internal fun RenderContext.latestUpdatesPage(filterId: String? = null) {
                 if (loading) pageLoadingOverlay(UiMessages.app_refreshingFeed())
             }
         }
-        pagination()
+        pagination(runtime)
     }
-    loadCatalogIfNeeded()
-    loadFilterOptionsIfNeeded()
-    loadSavedFiltersIfNeeded()
-    applyFilterRouteIfNeeded(filterId)
+    runtime.catalogCommands.loadCatalogIfNeeded()
+    runtime.catalogCommands.loadFilterOptionsIfNeeded()
+    runtime.filtersCommands.loadSavedFiltersIfNeeded()
+    runtime.filtersCommands.applyFilterRouteIfNeeded(filterId)
 }

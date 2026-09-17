@@ -1,18 +1,35 @@
 package f95gm.server.routes.session
 
-import f95gm.domain.api.F95HttpStatus
-import f95gm.server.http.response.respond
+import f95gm.server.observability.*
+import f95gm.server.http.request.currentRequestIdValue
+import f95gm.server.http.response.respondJson
 import f95gm.server.model.http.OkResponse
-import f95gm.server.persistence.sessions.removePersistedSession
-import f95gm.server.state.runtime.sessions
-import f95gm.server.state.runtime.upstreamJson
+import f95gm.server.routes.session.sessionDependencies
 import io.ktor.server.application.*
+import f95gm.server.config.constants.HttpStatusCatalog
 
 internal suspend fun logout(call: ApplicationCall) {
-    browserSession(call)?.let {
-        sessions.remove(it.first)
-        removePersistedSession(it.first)
+    val current = browserSession(call, call.sessionDependencies.sessions)
+    if (current is BrowserSession.Found) {
+        call.sessionDependencies.sessionService.removeInMemory(current.id)
+        call.sessionDependencies.sessionService.remove(current.id)
     }
     clearBrowserCookie(call)
-    respond(call, F95HttpStatus.SUCCESS_MIN, upstreamJson.encodeToString(OkResponse(true)))
+    logger.info {
+        auditLog(
+            AuditEvent(
+                AuditEventName.LOGOUT, listOf(
+                    logField(StructuredLogKeys.REQUEST_ID, currentRequestIdValue()),
+                    logField(
+                        StructuredLogKeys.ACCOUNT,
+                        redactLogValue(
+                            "accountKey=${(current as? BrowserSession.Found)?.session?.accountKey?.value ?: "-"}"
+                        )
+                    ),
+                    logField(StructuredLogKeys.OUTCOME, AuditOutcome.SUCCESS.wireName)
+                )
+            )
+        )
+    }
+    respondJson(call, HttpStatusCatalog.OK, OkResponse(true))
 }

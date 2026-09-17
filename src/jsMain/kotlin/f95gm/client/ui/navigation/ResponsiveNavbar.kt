@@ -4,6 +4,7 @@ import dev.fritz2.core.RenderContext
 import dev.fritz2.core.id
 import dev.fritz2.core.type
 import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
+import f95gm.client.state.runtime.ClientNavigationUiPort
 import f95gm.messages.UiMessages
 
 internal enum class NavbarPage {
@@ -13,6 +14,7 @@ internal enum class NavbarPage {
 }
 
 internal fun RenderContext.responsiveNavbar(
+    runtime: ClientNavigationUiPort,
     navigationId: String,
     page: NavbarPage,
     toolbar: RenderContext.() -> Unit,
@@ -23,9 +25,9 @@ internal fun RenderContext.responsiveNavbar(
         div("navbar-wrap w-100") {
             div("navbar-inner container-fluid px-0") {
                 div("navbar-row d-flex flex-wrap align-items-center w-100 gap-2 px-2") {
-                    navbarBrand(removeEndMargin = true)
-                    jvmConnectionDetails()
-                    navbarReloadButton(page)
+                    navbarBrand(NavbarBrandSpacing.COMPACT)
+                    jvmConnectionDetails(runtime)
+                    navbarReloadButton(runtime, page)
                     when (page) {
                         NavbarPage.CATALOG -> navbarNavigationLink(NavbarLink.TRACKED_GAMES)
                         NavbarPage.TRACKED_GAMES -> navbarNavigationLink(NavbarLink.CATALOG)
@@ -48,7 +50,7 @@ internal fun RenderContext.responsiveNavbar(
                         id(navigationId)
                         toolbar()
                     }
-                    navbarAccountLinks(leadingAccountAction)
+                    navbarAccountLinks(runtime, leadingAccountAction)
                     trailingAction()
                 }
             }

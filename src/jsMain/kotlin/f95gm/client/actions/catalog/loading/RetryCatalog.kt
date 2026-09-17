@@ -1,8 +1,7 @@
 package f95gm.client.actions.catalog.loading
 
-import f95gm.client.state.runtime.scope
-import kotlinx.coroutines.launch
+import f95gm.client.state.runtime.ClientCatalogActionsPort
 
-internal fun retryCatalog() {
-    scope.launch { loadCatalog() }
+internal fun retryCatalog(runtime: ClientCatalogActionsPort) {
+    launchCatalogLoad(runtime)
 }

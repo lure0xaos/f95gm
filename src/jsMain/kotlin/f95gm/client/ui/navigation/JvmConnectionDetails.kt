@@ -2,12 +2,13 @@ package f95gm.client.ui.navigation
 
 import dev.fritz2.core.RenderContext
 import dev.fritz2.core.type
-import f95gm.client.state.runtime.jvmConnection
+import f95gm.client.state.runtime.ClientNavigationUiPort
 import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.jvmConnectionDetails() {
+internal fun RenderContext.jvmConnectionDetails(runtime: ClientNavigationUiPort) {
+    val jvmConnection = runtime.jvmConnectionView
     div("connection-diagnostics dropdown") {
         button("connection-diagnostics-toggle $secondaryNavigationButtonClass btn-sm px-2 dropdown-toggle") {
             type("button")
@@ -21,7 +22,6 @@ internal fun RenderContext.jvmConnectionDetails() {
                     "jvm-connection-indicator rounded-circle d-inline-block me-1 " +
                             if (state.connected) "bg-success" else "bg-danger"
                 })
-                attr("style", "width: 0.65rem; height: 0.65rem;")
             }
             span("d-none d-sm-inline") {
                 jvmConnection.data.map { jvmConnectionStatusLabel(it.status) }.render { +it }
@@ -41,17 +41,17 @@ internal fun RenderContext.jvmConnectionDetails() {
                     div("fw-semibold") { +UiMessages.app_localJvmServer() }
                     div("text-body-secondary") { +jvmConnectionStatusLabel(state.status) }
                     div("text-body-secondary") {
-                        +(state.healthStatus?.let { UiMessages.app_httpStatus(it.toString()) }
+                        +(state.healthStatus?.let { UiMessages.app_httpStatus(it.value.toString()) }
                             ?: UiMessages.app_noRequestYet())
                     }
                     div("fw-semibold mt-3") { +UiMessages.app_f95zone() }
                     div("text-body-secondary") { +upstreamConnectionStatusLabel(state.upstreamStatus) }
                     div("text-body-secondary") {
-                        +(state.upstreamHttpStatus?.let { UiMessages.app_httpStatus(it.toString()) }
+                        +(state.upstreamHttpStatus?.let { UiMessages.app_httpStatus(it.value.toString()) }
                             ?: UiMessages.app_noRequestYet())
                     }
-                    if (state.upstreamPath.isNotBlank()) {
-                        div("text-body-secondary text-break") { +state.upstreamPath }
+                    if (state.upstreamPath.value.isNotBlank()) {
+                        div("text-body-secondary text-break") { +state.upstreamPath.value }
                     }
                 }
             }
