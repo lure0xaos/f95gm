@@ -1,33 +1,42 @@
 package f95gm.server.routes.session
 
-import f95gm.domain.api.F95HttpStatus
 import f95gm.messages.UiMessages
 import f95gm.server.config.constants.ServerConstants
 import f95gm.server.http.auth.isAuthenticatedUpstreamResponse
-import f95gm.server.http.response.jsonMessage
-import f95gm.server.http.response.respond
+import f95gm.server.http.response.ApiFailure
+import f95gm.server.http.response.ServerMessageKeys
+import f95gm.server.http.response.respondFailure
+import f95gm.server.http.response.respondJson
 import f95gm.server.model.http.OkResponse
-import f95gm.server.persistence.sessions.removePersistedSession
-import f95gm.server.state.runtime.sessions
-import f95gm.server.state.runtime.upstreamJson
+import f95gm.server.state.runtime.routeDependencies
 import f95gm.server.upstream.request.upstreamRequest
+import io.ktor.http.*
 import io.ktor.server.application.*
 
 internal suspend fun sessionStatus(call: ApplicationCall) {
-    val current = browserSession(call)
+    val current = browserSession(call, call.routeDependencies.sessions)
     if (current == null) {
-        respond(call, ServerConstants.STATUS_UNAUTHORIZED, jsonMessage(UiMessages.server_noActiveSession()))
+        clearBrowserCookie(call)
+        respondFailure(
+            call,
+            ServerConstants.STATUS_UNAUTHORIZED,
+            ApiFailure(UiMessages.server_noActiveSession(), ServerMessageKeys.SESSION_MISSING)
+        )
         return
     }
 
     val (id, session) = current
-    val verified = upstreamRequest("GET", "/sam/latest_alpha/", session)
+    val verified = call.routeDependencies.upstreamRequest(HttpMethod.Get, "/sam/latest_alpha/", session)
     if (isAuthenticatedUpstreamResponse(verified)) {
-        respond(call, F95HttpStatus.SUCCESS_MIN, upstreamJson.encodeToString(OkResponse(true)))
+        respondJson(call, ServerConstants.STATUS_OK, OkResponse(true))
     } else {
-        sessions.remove(id)
-        removePersistedSession(id)
+        call.routeDependencies.sessionService.removeInMemory(id)
+        call.routeDependencies.sessionService.remove(id)
         clearBrowserCookie(call)
-        respond(call, ServerConstants.STATUS_UNAUTHORIZED, jsonMessage(UiMessages.server_sessionExpired()))
+        respondFailure(
+            call,
+            ServerConstants.STATUS_UNAUTHORIZED,
+            ApiFailure(UiMessages.server_sessionExpired(), ServerMessageKeys.SESSION_EXPIRED)
+        )
     }
 }

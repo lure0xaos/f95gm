@@ -1,10 +1,5 @@
 package f95gm.client.routing.navigation
 
-import f95gm.client.routing.pages.Pages
-import f95gm.client.routing.pages.routeFilterId
-import f95gm.client.routing.pages.routePage
+import f95gm.domain.values.F95FilterId
 
-internal fun filterRoute(filterId: String): Route = mapOf(
-    routePage to Pages.LATEST_UPDATES,
-    routeFilterId to filterId
-)
+internal fun filterRoute(filterId: F95FilterId): TypedRoute = TypedRoute.LatestUpdates(filterId)

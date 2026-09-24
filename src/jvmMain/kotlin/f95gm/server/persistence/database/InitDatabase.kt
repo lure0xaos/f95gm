@@ -1,19 +1,24 @@
 package f95gm.server.persistence.database
 
-import f95gm.server.config.database.databaseProperty
+import f95gm.server.config.ServerConfig
 import f95gm.server.config.logging.logger
-import f95gm.server.persistence.schema.persistenceTables
-import f95gm.server.state.runtime.database
 import org.jetbrains.exposed.v1.jdbc.Database
-import org.jetbrains.exposed.v1.jdbc.SchemaUtils
-import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
+
+internal class DatabaseInitializationFailure(cause: Exception) :
+    IllegalStateException("Database initialization failed", cause)
 
 @Suppress("SpreadOperator")
-internal fun initDatabase() {
-    val configured = System.getProperty(databaseProperty, defaultDatabasePath()).trim()
+internal fun initDatabase(config: ServerConfig): Database {
+    val configured = config.database.ifBlank { defaultDatabasePath() }
     val path = configured.takeUnless { it.startsWith("jdbc:") }
         ?.let { Path.of(it).toAbsolutePath().normalize() }
     val url = path?.let {
@@ -23,8 +28,58 @@ internal fun initDatabase() {
     logger.info {
         "Using database ${path?.absolutePathString() ?: "configured JDBC URL"}"
     }
-    database = Database.connect(url = url, driver = "org.h2.Driver")
-    transaction(database) {
-        SchemaUtils.create(*persistenceTables)
+    val databaseFile = path?.resolveSibling("${path.fileName}.mv.db")
+    val backupFile = databaseFile?.resolveSibling("${databaseFile.fileName}.bak")
+    if (databaseFile?.exists() == true && backupFile != null) {
+        try {
+            createDatabaseBackup(databaseFile, backupFile)
+            logger.info { "Created database migration backup ${backupFile.absolutePathString()} (retained generations: 3)" }
+        } catch (error: Exception) {
+            throw DatabaseInitializationFailure(error)
+        }
+    }
+    val database = Database.connect(url = url, driver = "org.h2.Driver")
+    try {
+        migrateDatabase(database)
+    } catch (error: Exception) {
+        logger.error(error) { "Database migration failed; backup is available at ${backupFile?.absolutePathString() ?: "configured JDBC backup"}" }
+        throw DatabaseInitializationFailure(error)
+    }
+    return database
+}
+
+private const val DATABASE_BACKUP_GENERATIONS = 3
+
+internal fun createDatabaseBackup(databaseFile: Path, backupFile: Path) {
+    val parent = databaseFile.parent ?: error("Database file must have a parent directory")
+    val temporary = Files.createTempFile(parent, "${databaseFile.fileName}.", ".backup.tmp")
+    try {
+        Files.copy(databaseFile, temporary, REPLACE_EXISTING)
+        check(Files.size(temporary) == Files.size(databaseFile)) {
+            "Database backup size does not match the source database"
+        }
+        for (generation in DATABASE_BACKUP_GENERATIONS - 1 downTo 1) {
+            val current = generationPath(backupFile, generation)
+            val next = generationPath(backupFile, generation + 1)
+            if (current.exists()) moveReplacing(current, next)
+        }
+        if (backupFile.exists()) moveReplacing(backupFile, generationPath(backupFile, 1))
+        moveReplacing(temporary, backupFile)
+        check(Files.size(backupFile) == Files.size(databaseFile)) {
+            "Database backup validation failed after atomic replacement"
+        }
+    } finally {
+        temporary.deleteIfExists()
+    }
+}
+
+private fun generationPath(backupFile: Path, generation: Int): Path =
+    backupFile.resolveSibling("${backupFile.fileName}.$generation")
+
+private fun moveReplacing(source: Path, target: Path) {
+    try {
+        Files.move(source, target, ATOMIC_MOVE, REPLACE_EXISTING)
+    } catch (_: AtomicMoveNotSupportedException) {
+        Files.move(source, target, REPLACE_EXISTING)
     }
 }

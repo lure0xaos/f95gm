@@ -8,7 +8,11 @@ internal fun setCookiePairs(header: String): List<Pair<String, String>> {
         if (nameEnd != -1 && nameEnd < header.length && header[nameEnd] == '=') {
             val valueStart = nameEnd + 1
             val valueEnd = cookieValueEnd(header, valueStart)
-            pairs += header.substring(candidate, nameEnd) to header.substring(valueStart, valueEnd).trim()
+            val name = header.substring(candidate, nameEnd)
+            val value = header.substring(valueStart, valueEnd).trim()
+            if (name.all(::isCookieNameCharacter) && value.none { it == ';' || it == '\r' || it == '\n' || it.code < 0x20 }) {
+                pairs += name to value
+            }
             candidate = nextCookiePairStart(header, valueEnd)
         } else {
             candidate = nextCookiePairStart(header, candidate)

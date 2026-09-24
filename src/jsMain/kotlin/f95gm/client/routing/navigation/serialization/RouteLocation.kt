@@ -2,10 +2,14 @@ package f95gm.client.routing.navigation.serialization
 
 import dev.fritz2.routing.decodeURIComponent
 import dev.fritz2.routing.encodeURIComponent
-import f95gm.client.routing.navigation.Route
+import f95gm.client.routing.navigation.RouteAdapter
+import f95gm.client.routing.navigation.TypedRoute
 import f95gm.client.routing.pages.*
 
 internal object RouteLocation {
+    fun fromPathTyped(pathname: String, search: String): TypedRoute =
+        RouteAdapter.decode(fromPath(pathname, search))
+
     fun fromPath(pathname: String, search: String): Route {
         val threadId = itemThreadId(pathname)
         val query = parameters(search)

@@ -4,6 +4,7 @@ import dev.fritz2.core.RenderContext
 import dev.fritz2.core.disabled
 import dev.fritz2.core.type
 import f95gm.client.actions.catalog.loading.reloadCatalog
+import f95gm.client.actions.marks.loading.MarkCheckNotification
 import f95gm.client.actions.marks.loading.checkMarkedGames
 import f95gm.client.state.catalog.catalog
 import f95gm.client.state.marks.marks
@@ -19,7 +20,7 @@ internal fun RenderContext.navbarReloadButton(page: NavbarPage) {
         span("bi bi-arrow-clockwise") {}
         if (page == NavbarPage.TRACKED_GAMES || page == NavbarPage.SETTINGS) {
             disabled(marks.data.map { it.loading || it.checking })
-            clicks handledBy { checkMarkedGames(showToast = false) }
+            clicks handledBy { checkMarkedGames(MarkCheckNotification.SILENT) }
         } else {
             disabled(catalog.data.map { it.loading })
             clicks handledBy { reloadCatalog() }

@@ -13,5 +13,9 @@ internal object MarksTable : Table("marks") {
     val lastSeenUpdateVersion = varchar("last_seen_update_version", ServerConstants.STORED_VERSION_LENGTH).default("")
     val updatedAt = long("updated_at")
 
+    init {
+        index("marks_account_updated_at_idx", false, accountKey, updatedAt)
+    }
+
     override val primaryKey = PrimaryKey(accountKey, threadId)
 }

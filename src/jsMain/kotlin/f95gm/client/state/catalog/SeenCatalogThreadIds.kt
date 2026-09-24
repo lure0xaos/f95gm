@@ -1,7 +1,7 @@
 package f95gm.client.state.catalog
 
 import f95gm.client.model.catalog.Game
-import kotlinx.browser.window
+import f95gm.client.state.runtime.BrowserStorage
 
 internal object SeenCatalogThreadIds {
     private const val STORAGE_KEY = "f95gm.catalog.seenThreadIds"
@@ -19,14 +19,17 @@ internal object SeenCatalogThreadIds {
         return marked
     }
 
-    fun markNew(threadId: String, upstreamNew: Boolean): Boolean =
-        upstreamNew || (load().isNotEmpty() && threadId !in load())
+    fun markNew(threadId: String, upstreamNew: Boolean): Boolean {
+        if (upstreamNew) return true
+        val stored = load()
+        return stored.isNotEmpty() && threadId !in stored
+    }
 
     fun rememberThreadIds(threadIds: Iterable<String>) {
         remember(load().toMutableList(), threadIds)
     }
 
-    private fun load(): List<String> = window.localStorage.getItem(STORAGE_KEY)
+    private fun load(): List<String> = BrowserStorage.read(STORAGE_KEY)
         ?.split(SEPARATOR)
         ?.filter { it.isNotBlank() }
         .orEmpty()
@@ -36,6 +39,6 @@ internal object SeenCatalogThreadIds {
         threadIds.forEach { threadId ->
             if (known.add(threadId)) stored += threadId
         }
-        window.localStorage.setItem(STORAGE_KEY, stored.takeLast(MAX_IDS).joinToString(SEPARATOR))
+        BrowserStorage.write(STORAGE_KEY, stored.takeLast(MAX_IDS).joinToString(SEPARATOR))
     }
 }

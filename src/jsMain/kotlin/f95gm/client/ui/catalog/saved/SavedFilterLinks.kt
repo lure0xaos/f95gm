@@ -2,9 +2,9 @@ package f95gm.client.ui.catalog.saved
 
 import dev.fritz2.core.RenderContext
 import dev.fritz2.core.type
+import f95gm.client.routing.navigation.TypedRoute
 import f95gm.client.routing.navigation.filterRoute
 import f95gm.client.routing.navigation.router
-import f95gm.client.routing.pages.routeFilterId
 import f95gm.client.state.filters.savedFilters
 import f95gm.client.ui.shared.navigation.quickLinkNavigationButtonClass
 import f95gm.messages.UiMessages
@@ -14,7 +14,8 @@ import kotlinx.coroutines.flow.map
 
 internal fun RenderContext.savedFilterLinks() {
     savedFilters.data.map { it.items }.distinctUntilChanged()
-        .combine(router.data.map { it[routeFilterId] }.distinctUntilChanged()) { items, activeFilterId ->
+        .combine(router.data.map { (it as? TypedRoute.LatestUpdates)?.filterId?.value }
+            .distinctUntilChanged()) { items, activeFilterId ->
             items to activeFilterId
         }.render { (items, activeFilterId) ->
             if (items.isNotEmpty()) {
@@ -31,7 +32,7 @@ internal fun RenderContext.savedFilterLinks() {
                         items.forEach { filter ->
                             li("quick-item") {
                                 a("quick-link $quickLinkNavigationButtonClass text-start text-nowrap") {
-                                    clicks.map { filterRoute(filter.id.value) } handledBy router.navTo
+                                    clicks.map { filterRoute(filter.id) } handledBy router.navTo
                                     +filter.name.value
                                 }
                             }

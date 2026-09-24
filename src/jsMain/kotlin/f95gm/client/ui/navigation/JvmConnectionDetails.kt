@@ -21,7 +21,6 @@ internal fun RenderContext.jvmConnectionDetails() {
                     "jvm-connection-indicator rounded-circle d-inline-block me-1 " +
                             if (state.connected) "bg-success" else "bg-danger"
                 })
-                attr("style", "width: 0.65rem; height: 0.65rem;")
             }
             span("d-none d-sm-inline") {
                 jvmConnection.data.map { jvmConnectionStatusLabel(it.status) }.render { +it }

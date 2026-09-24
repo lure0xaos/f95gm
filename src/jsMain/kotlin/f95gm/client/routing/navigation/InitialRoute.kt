@@ -1,7 +1,7 @@
 package f95gm.client.routing.navigation
 
 import f95gm.client.routing.navigation.serialization.RouteLocation
-import kotlinx.browser.window
+import f95gm.client.state.runtime.BrowserRuntime
 
-internal fun initialRoute(): Route =
-    RouteLocation.fromPath(window.location.pathname, window.location.search)
+internal fun initialRoute(): TypedRoute =
+    RouteLocation.fromPathTyped(BrowserRuntime.pathname, BrowserRuntime.search)

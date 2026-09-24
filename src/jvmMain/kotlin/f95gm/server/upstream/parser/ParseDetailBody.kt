@@ -6,6 +6,7 @@ import f95gm.messages.UiMessages
 import f95gm.server.config.upstream.upstream
 import f95gm.server.model.detail.DetailSection
 import f95gm.server.model.detail.ParsedDetailBody
+import f95gm.server.upstream.parser.spoiler.SpoilerContentMode
 import f95gm.server.upstream.parser.spoiler.splitSpoilerSections
 import org.jsoup.Jsoup
 
@@ -30,7 +31,7 @@ internal fun parseDetailBody(html: String): ParsedDetailBody {
     }
     val overviewParts = splitSpoilerSections(
         DetailSection(F95OptionName(UiMessages.app_overview()), F95Html(overview)),
-        discardNonSpoilerContent = false
+        contentMode = SpoilerContentMode.KEEP_NON_SPOILER_CONTENT
     )
     val normalizedOverview = overviewParts
         .firstOrNull { it.title.value.equals(UiMessages.app_overview(), ignoreCase = true) }
@@ -42,7 +43,11 @@ internal fun parseDetailBody(html: String): ParsedDetailBody {
     val sections = parsedSections.flatMap { section ->
         splitSpoilerSections(
             section,
-            discardNonSpoilerContent = section.title.value.equals("Changelog", ignoreCase = true)
+            contentMode = if (section.title.value.equals("Changelog", ignoreCase = true)) {
+                SpoilerContentMode.DISCARD_NON_SPOILER_CONTENT
+            } else {
+                SpoilerContentMode.KEEP_NON_SPOILER_CONTENT
+            }
         )
     }
     return ParsedDetailBody(normalizedOverview, overviewSpoilers + sections)

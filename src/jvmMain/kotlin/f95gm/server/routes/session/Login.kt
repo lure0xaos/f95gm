@@ -1,52 +1,71 @@
 package f95gm.server.routes.session
 
+import f95gm.domain.api.F95ApiErrorCode
 import f95gm.domain.api.F95HttpStatus
 import f95gm.domain.values.F95AccountKey
+import f95gm.domain.values.F95SessionId
 import f95gm.messages.UiMessages
 import f95gm.server.config.constants.ServerConstants
-import f95gm.server.config.logging.logger
+import f95gm.server.config.logging.*
 import f95gm.server.config.upstream.upstream
 import f95gm.server.http.auth.isAuthenticatedUpstreamResponse
 import f95gm.server.http.auth.isUnauthenticatedUpstreamBody
 import f95gm.server.http.auth.upstreamLoginMessage
+import f95gm.server.http.logging.redactLogValue
+import f95gm.server.http.request.currentRequestContext
+import f95gm.server.http.request.decodeJsonOrNull
+import f95gm.server.http.request.receiveLimitedText
 import f95gm.server.http.request.requestField
-import f95gm.server.http.response.encode
-import f95gm.server.http.response.jsonMessage
-import f95gm.server.http.response.respond
+import f95gm.server.http.response.*
 import f95gm.server.model.auth.LoginRequest
 import f95gm.server.model.auth.UpstreamSession
 import f95gm.server.model.http.OkResponse
-import f95gm.server.persistence.sessions.persistSession
-import f95gm.server.state.runtime.sessions
-import f95gm.server.state.runtime.upstreamJson
+import f95gm.server.state.runtime.routeDependencies
+import f95gm.server.upstream.request.UpstreamHeaders
 import f95gm.server.upstream.request.followUpstreamRedirects
 import f95gm.server.upstream.request.upstreamRequest
 import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.request.*
 import org.jsoup.Jsoup
 import kotlin.uuid.Uuid
 
 internal suspend fun login(call: ApplicationCall) {
-    val body = call.receiveText()
-    val jsonRequest = runCatching { upstreamJson.decodeFromString<LoginRequest>(body) }.getOrNull()
+    val body = call.receiveLimitedText(ServerConstants.MAX_REQUEST_BODY_BYTES)
+    val jsonRequest = decodeJsonOrNull<LoginRequest>(body)
+    if (body.trimStart().startsWith("{") && jsonRequest == null) {
+        respondFailure(
+            call,
+            ServerConstants.STATUS_BAD_REQUEST,
+            ApiFailure("Invalid JSON request", ServerMessageKeys.INVALID_JSON_REQUEST, F95ApiErrorCode.INVALID_INPUT)
+        )
+        return
+    }
     val login = (jsonRequest?.login ?: requestField(body, "login")).orEmpty().trim()
     val password = (jsonRequest?.password ?: requestField(body, "password")).orEmpty()
     if (login.isBlank() || password.isBlank()) {
-        respond(call, ServerConstants.STATUS_BAD_REQUEST, jsonMessage(UiMessages.server_credentialsRequired()))
+        respondFailure(
+            call,
+            ServerConstants.STATUS_BAD_REQUEST,
+            ApiFailure(UiMessages.server_credentialsRequired(), ServerMessageKeys.CREDENTIALS_REQUIRED)
+        )
         return
     }
 
-    val upstreamSession = UpstreamSession(accountKey = F95AccountKey(login.lowercase()))
-    val loginPage = upstreamRequest(
-        method = "GET",
+    val browserId = F95SessionId(Uuid.random().toString())
+    val upstreamSession = UpstreamSession(browserId = browserId, accountKey = F95AccountKey(login.lowercase()))
+    val loginPage = call.routeDependencies.upstreamRequest(
+        method = HttpMethod.Get,
         path = ServerConstants.UPSTREAM_LOGIN_PAGE,
         session = upstreamSession,
-        headers = mapOf(HttpHeaders.Referrer to upstream)
+        headers = UpstreamHeaders.of(mapOf(HttpHeaders.Referrer to upstream))
     )
     val token = Jsoup.parse(loginPage.body).selectFirst("input[name=_xfToken]")?.attr("value")
     if (token.isNullOrBlank()) {
-        respond(call, ServerConstants.STATUS_BAD_GATEWAY, jsonMessage(UiMessages.server_loginTokenMissing()))
+        respondFailure(
+            call,
+            ServerConstants.STATUS_BAD_GATEWAY,
+            ApiFailure(UiMessages.server_loginTokenMissing(), ServerMessageKeys.LOGIN_TOKEN_MISSING)
+        )
         return
     }
 
@@ -61,13 +80,14 @@ internal suspend fun login(call: ApplicationCall) {
         "_xfRedirect" to upstream,
         "_xfToken" to token
     ).joinToString("&") { (key, value) -> "${encode(key)}=${encode(value)}" }
-    val loginResponse = upstreamRequest(
-        method = "POST",
+    val loginResponse = call.routeDependencies.upstreamRequest(
+        method = HttpMethod.Post,
         path = ServerConstants.UPSTREAM_LOGIN,
         session = upstreamSession,
         body = form,
         contentType = "application/x-www-form-urlencoded",
-        headers = mapOf(
+        headers = UpstreamHeaders.of(
+            mapOf(
             HttpHeaders.Referrer to upstream,
             HttpHeaders.Origin to upstream,
             HttpHeaders.AcceptLanguage to "en-US,en;q=0.9",
@@ -75,47 +95,74 @@ internal suspend fun login(call: ApplicationCall) {
             "Sec-Fetch-Mode" to "navigate",
             "Sec-Fetch-User" to "?1",
             "Sec-Fetch-Dest" to "document"
+            )
         )
     )
-    val result = followUpstreamRedirects(loginResponse, upstreamSession)
-    val verified = upstreamRequest("GET", "/sam/latest_alpha/", upstreamSession)
+    val result = followUpstreamRedirects(call.routeDependencies, loginResponse, upstreamSession)
+    val verified = call.routeDependencies.upstreamRequest(HttpMethod.Get, "/sam/latest_alpha/", upstreamSession)
+    if (call.respondUpstreamFailure(result) || call.respondUpstreamFailure(verified)) return
     val verifiedSession = isAuthenticatedUpstreamResponse(verified)
-    if (result.status !in F95HttpStatus.SUCCESS_MIN..ServerConstants.REDIRECT_STATUS_MAX || !verifiedSession) {
+    if (result.status.value !in F95HttpStatus.SUCCESS_MIN..ServerConstants.REDIRECT_STATUS_MAX || !verifiedSession) {
         val upstreamMessage = upstreamLoginMessage(result.body)
         logger.warn {
             "F95zone login verification failed: initialStatus=${loginResponse.status}, " +
-                    "initialLocation=${loginResponse.location ?: "none"}, finalStatus=${result.status}, " +
-                    "verificationStatus=${verified.status}, cookies=${upstreamSession.cookies.keys.joinToString(",")}, " +
+                    "initialLocation=${loginResponse.location?.substringBefore('?') ?: "none"}, finalStatus=${result.status.value}, " +
+                    "verificationStatus=${verified.status}, cookies=${
+                        upstreamSession.cookieEntries().keys.joinToString(
+                            ","
+                        )
+                    }, " +
                     "finalUnauthenticated=${isUnauthenticatedUpstreamBody(result.body)}, " +
                     "verificationUnauthenticated=${isUnauthenticatedUpstreamBody(verified.body)}, " +
-                    "message=${upstreamMessage ?: "none"}"
+                    "message=${redactLogValue(upstreamMessage ?: "none")}"
+        }
+        logger.info {
+            auditLog(
+                AuditEvent(
+                    AuditEventName.LOGIN_FAILED, listOf(
+                        logField("requestId", currentRequestContext()?.requestId?.value),
+                        logField("account", redactLogValue(login)),
+                        logField("outcome", "failure")
+                    )
+                )
+            )
         }
         val message = if (upstreamMessage?.contains("incorrect", ignoreCase = true) == true) {
             UiMessages.server_credentialsRejected()
         } else if (!upstreamMessage.isNullOrBlank()) {
             upstreamMessage
         } else if (!verifiedSession) {
-            if (ServerConstants.UPSTREAM_SESSION_COOKIE !in upstreamSession.cookies) {
+            if (ServerConstants.UPSTREAM_SESSION_COOKIE !in upstreamSession.cookieEntries()) {
                 UiMessages.server_sessionNotConfirmedCookie(
-                    loginResponse.location ?: "none",
+                    loginResponse.location?.substringBefore('?') ?: "none",
                     verified.status
                 )
             } else {
                 UiMessages.server_sessionNotConfirmedPage(
-                    loginResponse.location ?: "none",
+                    loginResponse.location?.substringBefore('?') ?: "none",
                     verified.status
                 )
             }
         } else {
-            UiMessages.server_loginFailed(result.status)
+            UiMessages.server_loginFailed(result.status.value)
         }
-        respond(call, ServerConstants.STATUS_UNAUTHORIZED, jsonMessage(message))
+        respondFailure(call, ServerConstants.STATUS_UNAUTHORIZED, ApiFailure(message, ServerMessageKeys.LOGIN_FAILED))
         return
     }
 
-    val browserId = Uuid.random().toString()
-    sessions[browserId] = upstreamSession
-    persistSession(browserId, upstreamSession)
+    call.routeDependencies.sessions.put(browserId, upstreamSession)
+    call.routeDependencies.sessionService.persist(browserId, upstreamSession)
+    logger.info {
+        auditLog(
+            AuditEvent(
+                AuditEventName.LOGIN_SUCCEEDED, listOf(
+                    logField("requestId", currentRequestContext()?.requestId?.value),
+                    logField("account", redactLogValue(login)),
+                    logField("outcome", "success")
+                )
+            )
+        )
+    }
     setBrowserCookie(call, browserId)
-    respond(call, F95HttpStatus.SUCCESS_MIN, upstreamJson.encodeToString(OkResponse(true)))
+    respondJson(call, ServerConstants.STATUS_OK, OkResponse(true))
 }

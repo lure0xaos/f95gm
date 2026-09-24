@@ -11,9 +11,9 @@ import f95gm.domain.filters.F95Category
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-internal fun selectCategory(category: String) {
+internal fun selectCategory(category: F95Category) {
     scope.launch {
-        val next = catalog.data.first().copy(category = F95Category.fromWire(category), page = F95Defaults.FIRST_PAGE)
+        val next = catalog.data.first().copy(category = category, page = F95Defaults.FIRST_PAGE)
         catalog.enqueue { next.copy(loading = true, error = "") }
         router.navTo(latestUpdatesRoute)
         loadFilterOptions(next.category)

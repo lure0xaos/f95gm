@@ -8,8 +8,13 @@ import f95gm.client.routing.navigation.router
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.navbarBrand(removeEndMargin: Boolean = false) {
-    a("brand navbar-brand${if (removeEndMargin) " me-0" else ""} d-flex align-items-center gap-2 fw-bold") {
+internal enum class NavbarBrandSpacing {
+    DEFAULT,
+    COMPACT
+}
+
+internal fun RenderContext.navbarBrand(spacing: NavbarBrandSpacing = NavbarBrandSpacing.DEFAULT) {
+    a("brand navbar-brand${if (spacing == NavbarBrandSpacing.COMPACT) " me-0" else ""} d-flex align-items-center gap-2 fw-bold") {
         clicks.map { latestUpdatesRoute } handledBy router.navTo
         img("brand-icon rounded-3") {
             attr("width", "40")

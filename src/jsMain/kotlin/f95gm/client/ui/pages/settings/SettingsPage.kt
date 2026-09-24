@@ -20,30 +20,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 internal fun RenderContext.settingsPage() {
-    fun themeLabel(theme: AppTheme): String = when (theme) {
-        AppTheme.DARK -> UiMessages.app_themeDark()
-        AppTheme.LIGHT -> UiMessages.app_themeLight()
-        AppTheme.SYSTEM -> UiMessages.app_themeSystem()
-    }
-
-    fun intervalLabel(interval: UpdateCheckInterval): String = when (interval) {
-        UpdateCheckInterval.DISABLED -> UiMessages.app_updatesDisabled()
-        UpdateCheckInterval.FIFTEEN_MINUTES -> UiMessages.app_every15Minutes()
-        UpdateCheckInterval.HOUR -> UiMessages.app_everyHour()
-        UpdateCheckInterval.SIX_HOURS -> UiMessages.app_every6Hours()
-        UpdateCheckInterval.DAY -> UiMessages.app_everyDay()
-    }
-
-    fun pageSizeLabel(size: PageSize): String = "${size.value}"
-
-    fun cardSizeLabel(size: CardSize): String = when (size) {
-        CardSize.VERY_COMPACT -> UiMessages.app_cardSizeVeryCompact()
-        CardSize.COMPACT -> UiMessages.app_cardSizeCompact()
-        CardSize.DEFAULT -> UiMessages.app_cardSizeDefault()
-        CardSize.LARGE -> UiMessages.app_cardSizeLarge()
-        CardSize.VERY_LARGE -> UiMessages.app_cardSizeVeryLarge()
-    }
-
     div("settings-page") {
         responsiveNavbar(
             navigationId = "settings-navigation",

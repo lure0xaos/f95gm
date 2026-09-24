@@ -13,4 +13,8 @@ internal object SavedFilterOptionsTable : Table("saved_filter_options") {
     val position = integer("position")
 
     override val primaryKey = PrimaryKey(filterId, kind, optionId)
+
+    init {
+        index("saved_filter_options_position_idx", false, filterId, kind, position)
+    }
 }

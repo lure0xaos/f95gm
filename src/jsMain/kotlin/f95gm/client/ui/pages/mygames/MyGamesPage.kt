@@ -5,6 +5,7 @@ import dev.fritz2.core.disabled
 import dev.fritz2.core.type
 import f95gm.client.actions.catalog.loading.loadFilterOptionsIfNeeded
 import f95gm.client.actions.filters.loadSavedFiltersIfNeeded
+import f95gm.client.actions.marks.loading.MarkCheckNotification
 import f95gm.client.actions.marks.loading.checkMarkedGames
 import f95gm.client.actions.marks.loading.loadMarksIfNeeded
 import f95gm.client.actions.marks.loading.retryMarkedGames
@@ -31,7 +32,7 @@ internal fun RenderContext.myGamesPage() {
                     span("bi bi-arrow-repeat me-1") {}
                     +UiMessages.app_checkForUpdates()
                     disabled(marks.data.map { it.checking })
-                    clicks handledBy { checkMarkedGames(showToast = true) }
+                    clicks handledBy { checkMarkedGames(MarkCheckNotification.SHOW_TOAST) }
                 }
             }
         )

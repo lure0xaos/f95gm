@@ -1,12 +1,5 @@
 package f95gm.client.model.marks
 
-import f95gm.domain.tracking.GameTrackingState
-import f95gm.domain.values.StoredVersion
-import kotlinx.serialization.Serializable
+import f95gm.domain.api.F95MarkRequest
 
-@Serializable
-internal data class MarkRequestBody(
-    val trackingState: GameTrackingState,
-    val storedVersion: StoredVersion,
-    val acknowledge: Boolean
-)
+internal typealias MarkRequestBody = F95MarkRequest

@@ -22,17 +22,13 @@ internal fun RenderContext.detailGallery() {
         })
         attr("role", "dialog")
         attr("aria-modal", "true")
-        attr("style", "z-index: 2000;")
         clicks handledBy { closeDetailGallery() }
 
         div("gallery-stage position-relative d-flex align-items-center justify-content-center w-100 h-100 p-3") {
             clicks { stopPropagation() } handledBy { }
 
             img("gallery-image mw-100 mh-100 rounded shadow") {
-                attr("style", detailGalleryStore.data.map {
-                    "max-width: 90vw; max-height: 85vh; transform-origin: center center; " +
-                            "transition: transform 120ms ease; transform: scale(${it.scale});"
-                })
+                className(detailGalleryStore.data.map { "gallery-image-scale-${(it.scale * 10).toInt()}" })
                 src(detailGalleryStore.data.map { it.current?.source.orEmpty() })
                 alt(detailGalleryStore.data.map { it.current?.alt.orEmpty() })
             }

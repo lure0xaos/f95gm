@@ -12,7 +12,7 @@ internal fun markedGamesView(state: MarksState): MarkedGamesView {
     }
     val sorted = when (state.sort) {
         F95Sort.DATE_ASC.wireValue -> filtered.sortedWith(
-            compareBy<MarkedGame> { it.updatedAt }
+            compareBy<MarkedGame> { it.updatedAt.value }
                 .thenBy { it.title.value.lowercase() }
         )
 
@@ -27,7 +27,7 @@ internal fun markedGamesView(state: MarksState): MarkedGamesView {
         )
 
         else -> filtered.sortedWith(
-            compareByDescending<MarkedGame> { it.updatedAt }
+            compareByDescending<MarkedGame> { it.updatedAt.value }
                 .thenBy { it.title.value.lowercase() }
         )
     }

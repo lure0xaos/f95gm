@@ -7,6 +7,7 @@ import f95gm.domain.filters.F95Sort
 import f95gm.domain.filters.F95TagType
 import f95gm.domain.values.F95FilterId
 import f95gm.domain.values.F95OptionName
+import f95gm.server.model.EpochMillis
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -24,5 +25,5 @@ internal data class SavedFilter(
     val excludedPrefixes: List<SavedFilterOption> = emptyList(),
     val tagType: F95TagType = F95TagType.OR,
     val dateLimit: Int = F95Defaults.ANY_DATE,
-    val updatedAt: Long = 0L
+    val updatedAt: EpochMillis = EpochMillis(0L)
 )

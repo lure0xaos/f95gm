@@ -1,5 +1,7 @@
 package f95gm.client.actions.auth
 
+import f95gm.client.data.api.apiResult
+import f95gm.client.data.api.apiUserMessage
 import f95gm.client.data.api.postJson
 import f95gm.client.model.auth.LoginRequestBody
 import f95gm.client.model.auth.SessionState
@@ -24,7 +26,7 @@ internal fun signIn() {
             return@launch
         }
         session.enqueue { SessionState(busy = true) }
-        runCatching {
+        apiResult {
             postJson(F95Api.LOGIN, clientJson.encodeToString(LoginRequestBody(values.login, values.password)))
         }.onSuccess {
             session.enqueue { SessionState(authenticated = true) }
@@ -37,7 +39,7 @@ internal fun signIn() {
             }
             router.navTo(myGamesRoute)
         }.onFailure { error ->
-            session.enqueue { SessionState(error = error.message ?: UiMessages.app_signInFailed()) }
+            session.enqueue { SessionState(error = error.apiUserMessage(UiMessages.app_signInFailed())) }
         }
     }
 }

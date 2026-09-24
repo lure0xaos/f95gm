@@ -13,8 +13,9 @@ import f95gm.server.config.filters.filterSorts
 import f95gm.server.model.filters.SavedFilter
 import f95gm.server.model.filters.SavedFilterRequest
 import f95gm.server.persistence.filters.alias.filterAlias
+import f95gm.server.state.runtime.ServerClock
 
-internal fun SavedFilterRequest.toSavedFilter(): SavedFilter? {
+internal fun SavedFilterRequest.toSavedFilter(clock: ServerClock): SavedFilter? {
     val filterName = name.value.trim().take(ServerConstants.FILTER_NAME_LENGTH)
     if (filterName.isBlank()) return null
     return SavedFilter(
@@ -31,6 +32,6 @@ internal fun SavedFilterRequest.toSavedFilter(): SavedFilter? {
         excludedPrefixes = sanitizeSavedFilterOptions(excludedPrefixes),
         tagType = tagType.takeIf { it == F95TagType.AND } ?: F95TagType.OR,
         dateLimit = dateLimit.coerceIn(F95Defaults.ANY_DATE, F95Defaults.MAX_DATE_DAYS),
-        updatedAt = System.currentTimeMillis()
+        updatedAt = f95gm.server.model.EpochMillis(clock.nowMillis())
     )
 }

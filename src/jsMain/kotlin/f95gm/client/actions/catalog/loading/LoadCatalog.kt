@@ -2,6 +2,8 @@ package f95gm.client.actions.catalog.loading
 
 import f95gm.client.actions.catalog.query.catalogPath
 import f95gm.client.data.api.apiErrorFallback
+import f95gm.client.data.api.apiResult
+import f95gm.client.data.api.apiUserMessage
 import f95gm.client.data.api.getJson
 import f95gm.client.data.catalog.parseCatalog
 import f95gm.client.model.catalog.CatalogState
@@ -12,7 +14,7 @@ import kotlinx.coroutines.flow.first
 internal suspend fun loadCatalog(requestState: CatalogState? = null) {
     val state = requestState ?: catalog.data.first()
     catalog.enqueue { it.copy(loading = true, error = "") }
-    runCatching {
+    apiResult {
         val payload = getJson(catalogPath(state))
         parseCatalog(payload)
     }.onSuccess { result ->
@@ -25,6 +27,6 @@ internal suspend fun loadCatalog(requestState: CatalogState? = null) {
             )
         }
     }.onFailure { error ->
-        catalog.enqueue { it.copy(loading = false, error = error.message ?: apiErrorFallback) }
+        catalog.enqueue { it.copy(loading = false, error = error.apiUserMessage(apiErrorFallback)) }
     }
 }

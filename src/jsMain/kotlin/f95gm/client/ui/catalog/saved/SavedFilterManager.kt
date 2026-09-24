@@ -52,7 +52,7 @@ internal fun RenderContext.savedFilterManager() {
                                         span("bi bi-trash") {}
                                         attr("aria-label", UiMessages.app_remove())
                                         title(UiMessages.app_remove())
-                                        clicks handledBy { deleteSavedFilter(filter.id.value) }
+                                        clicks handledBy { deleteSavedFilter(filter.id) }
                                     }
                                 }
                             }

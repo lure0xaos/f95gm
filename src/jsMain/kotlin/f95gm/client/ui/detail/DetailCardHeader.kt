@@ -10,7 +10,6 @@ internal fun RenderContext.detailCardHeader(title: String, bodyId: String, iconC
         attr("data-bs-target", "#$bodyId")
         attr("aria-controls", bodyId)
         attr("aria-expanded", "false")
-        attr("style", "cursor: pointer;")
         span("header-title d-flex align-items-center gap-1") {
             if (iconClass != null) span(iconClass) {}
             +title

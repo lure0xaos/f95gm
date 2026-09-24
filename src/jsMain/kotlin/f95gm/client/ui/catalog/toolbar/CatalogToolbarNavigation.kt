@@ -10,6 +10,7 @@ import f95gm.client.ui.shared.dropdown.bootstrapDropdown
 import f95gm.client.ui.shared.navigation.navigationButtonClass
 import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
 import f95gm.client.ui.shared.textFieldClass
+import f95gm.domain.filters.F95Category
 import f95gm.domain.filters.F95Sort
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.flowOf
@@ -33,7 +34,7 @@ internal fun RenderContext.catalogToolbarNavigation() {
             options = flowOf(categoryChoices),
             buttonClass = navigationButtonClass,
             widthClass = "w-auto"
-        ) { selectCategory(it) }
+        ) { selectCategory(F95Category.fromWire(it)) }
         div("catalog-search input-group flex-grow-1 flex-shrink-1") {
             span("search-icon $secondaryNavigationButtonClass rounded-0 rounded-start") {
                 attr("aria-hidden", "true")

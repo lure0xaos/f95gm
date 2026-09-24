@@ -4,7 +4,7 @@
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout
                     disableAnsi="false"
-                    pattern="%style{%d{HH:mm:ss.SSS}}{bright_black} %highlight{%-5level}{FATAL=bright_red, ERROR=bright_red, WARN=bright_yellow, INFO=bright_green, DEBUG=bright_cyan, TRACE=bright_black} %style{[%t]}{bright_blue} %style{%logger{36}}{bright_white} - %msg%n%throwable"/>
+                    pattern="%style{%d{HH:mm:ss.SSS}}{bright_black} %highlight{%-5level}{FATAL=bright_red, ERROR=bright_red, WARN=bright_yellow, INFO=bright_green, DEBUG=bright_cyan, TRACE=bright_black} %style{[%t]}{bright_blue} %style{%logger{36}}{bright_white} requestId=%X{requestId} - %msg%n%throwable"/>
         </Console>
     </Appenders>
     <Loggers>

@@ -42,14 +42,16 @@ internal fun RenderContext.detailMarkControls(state: DetailState) {
                 buttonClass = "$navigationButtonBaseClass badge rounded-pill ${if (selectedTrackingState.isBlank()) "text-bg-secondary" else "text-bg-primary"}",
                 widthClass = "w-auto"
             ) { selected ->
-                if (selected.isBlank()) unmarkGame(state.threadId.value)
-                else saveGameMark(
-                    GameMarkDraft(
-                        threadId = state.threadId.value,
-                        storedVersion = StoredVersion(currentVersion),
-                        trackingState = selected
+                if (selected.isBlank()) unmarkGame(state.threadId)
+                else GameTrackingState.fromWire(selected)?.let { trackingState ->
+                    saveGameMark(
+                        GameMarkDraft(
+                            threadId = state.threadId,
+                            storedVersion = StoredVersion(currentVersion),
+                            trackingState = trackingState
+                        )
                     )
-                )
+                }
             }
             if (mark?.updateAvailable == true) {
                 span("update-badge badge text-bg-warning text-wrap text-start") {
@@ -63,9 +65,9 @@ internal fun RenderContext.detailMarkControls(state: DetailState) {
                     clicks handledBy {
                         saveGameMark(
                             GameMarkDraft(
-                                threadId = state.threadId.value,
+                                threadId = state.threadId,
                                 storedVersion = StoredVersion(mark.latestVersion.value),
-                                trackingState = GameTrackingState.DOWNLOADED.wireValue,
+                                trackingState = GameTrackingState.DOWNLOADED,
                                 acknowledge = true
                             )
                         )

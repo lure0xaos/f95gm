@@ -12,6 +12,7 @@ plugins {
 }
 
 dependencyResolutionManagement {
+    // Kotlin/JS adds its Node distribution repository during toolchain setup.
     repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         mavenCentral()

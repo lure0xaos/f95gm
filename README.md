@@ -109,12 +109,23 @@ browser at the actual port.
 The JVM server listens on `127.0.0.1:8080` by default. These system properties can be supplied to `runJvm` or another
 JVM launch command:
 
-| Property          | Default           | Purpose                                               |
-|-------------------|-------------------|-------------------------------------------------------|
-| `f95gm.port`      | `8080`            | Local HTTP port; use `0` to select an available port. |
-| `f95gm.host`      | `127.0.0.1`       | Bind address for the local server.                    |
-| `f95gm.database`  | `~/F95GM/f95gm`   | H2 database file path, or a complete H2 JDBC URL.     |
-| `f95gm.staticDir` | bundled resources | Optional directory containing the browser files.      |
+| Property               | Default           | Purpose                                                                |
+|------------------------|-------------------|------------------------------------------------------------------------|
+| `f95gm.port`           | `8080`            | Local HTTP port; use `0` to select an available port.                  |
+| `f95gm.host`           | `127.0.0.1`       | Bind address for the local server.                                     |
+| `f95gm.database`       | `~/F95GM/f95gm`   | H2 database file path, or a complete H2 JDBC URL.                      |
+| `f95gm.staticDir`      | bundled resources | Optional directory containing the browser files.                       |
+| `f95gm.deploymentMode` | `SINGLE_INSTANCE` | Deployment boundary; process-local state requires one server instance. |
+| `f95gm.openBrowser`    | `true`            | Opens the default browser after startup.                               |
+
+Configuration precedence is: JVM system property, matching environment variable, then the documented default. For
+example, `f95gm.port` can also be supplied as `F95GM_PORT`; the system property wins when both are present. Sessions,
+rate-limit buckets, idempotency records, and caches are intentionally process-local. A multi-instance deployment must
+first provide shared replacements for those stores and coordinated shutdown before it is supported.
+
+Operational endpoints are `/api/live` for process liveness, `/api/ready` for accepting new traffic, and `/api/metrics`
+for local request counters. Readiness returns `503` while graceful shutdown is draining; liveness remains available so
+orchestrators can distinguish a draining instance from a crashed process.
 
 For example:
 

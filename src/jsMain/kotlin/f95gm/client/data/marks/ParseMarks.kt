@@ -1,5 +1,8 @@
 package f95gm.client.data.marks
 
+import f95gm.client.data.json.gameCover
+import f95gm.client.data.json.gameDeveloper
+import f95gm.client.data.json.gamePrefixes
 import f95gm.client.data.json.string
 import f95gm.client.model.marks.MarkedGame
 import f95gm.domain.marks.MarkJsonKeys
@@ -21,11 +24,11 @@ internal fun parseMarks(payload: String): List<MarkedGame> = Json.parseToJsonEle
             ?: GameTrackingState.WATCHING,
         title = F95GameTitle(item.string("title", UiMessages.app_untitledGame())),
         version = F95GameVersion(item.string("version", UiMessages.app_versionUnknown())),
-        developer = F95DeveloperName(item.string("developer")),
-        cover = F95CoverUrl(item.string("cover")),
-        prefixes = item["prefixes"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }
-            ?.map(::F95PrefixId)
-            ?.takeIf { it.isNotEmpty() }
+        developer = F95DeveloperName(item.gameDeveloper()),
+        cover = F95CoverUrl(item.gameCover()),
+        prefixes = item.gamePrefixes()
+            .map(::F95PrefixId)
+            .takeIf { it.isNotEmpty() }
             .orEmpty(),
         date = F95DateLabel(item.string("date", UiMessages.app_recently())),
         likes = F95MetricText(item.string("likes", "0")),
@@ -40,6 +43,6 @@ internal fun parseMarks(payload: String): List<MarkedGame> = Json.parseToJsonEle
             )
         ),
         updateAvailable = item["updateAvailable"]?.jsonPrimitive?.booleanOrNull == true,
-        updatedAt = item["updatedAt"]?.jsonPrimitive?.longOrNull ?: 0L
+        updatedAt = F95EpochMillis(item["updatedAt"]?.jsonPrimitive?.longOrNull ?: 0L)
     )
 }

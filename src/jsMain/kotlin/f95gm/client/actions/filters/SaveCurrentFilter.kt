@@ -1,6 +1,8 @@
 package f95gm.client.actions.filters
 
 import f95gm.client.actions.feedback.showToast
+import f95gm.client.data.api.apiResult
+import f95gm.client.data.api.apiUserMessage
 import f95gm.client.data.api.postJson
 import f95gm.client.data.filters.parseSavedFilters
 import f95gm.client.data.filters.savedFilterBody
@@ -11,18 +13,23 @@ import f95gm.client.state.filters.savedFilters
 import f95gm.client.state.runtime.scope
 import f95gm.domain.api.F95Api
 import f95gm.messages.UiMessages
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 internal fun saveCurrentFilter() {
     scope.launch {
-        val name = savedFilterName.data.first().trim()
+        val (rawName, catalogState) = combine(
+            savedFilterName.data,
+            catalog.data
+        ) { name, state -> name to state }.first()
+        val name = rawName.trim()
         if (name.isBlank()) {
             showToast(UiMessages.app_savedFilterNameRequired())
             return@launch
         }
-        runCatching {
-            postJson(F95Api.FILTERS, savedFilterBody(name, catalog.data.first()))
+        apiResult {
+            postJson(F95Api.FILTERS, savedFilterBody(name, catalogState))
         }.onSuccess { payload ->
             val saved = parseSavedFilters(payload).firstOrNull()
             if (saved == null) {
@@ -42,7 +49,7 @@ internal fun saveCurrentFilter() {
             savedFilterName.enqueue { "" }
             showToast(UiMessages.app_savedQuickLink(saved.name.value))
         }.onFailure { error ->
-            showToast(error.message ?: UiMessages.app_filterSaveFailed())
+            showToast(error.apiUserMessage(UiMessages.app_filterSaveFailed()))
         }
     }
 }

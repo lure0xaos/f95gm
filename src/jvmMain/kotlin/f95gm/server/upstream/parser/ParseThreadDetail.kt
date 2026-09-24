@@ -9,12 +9,12 @@ import f95gm.server.upstream.html.sanitizeThreadHtml
 import f95gm.server.upstream.media.proxyMediaUrl
 import org.jsoup.Jsoup
 
-internal fun parseThreadDetail(threadId: String, html: String): ThreadDetail {
+internal fun parseThreadDetail(threadId: F95ThreadId, html: String): ThreadDetail {
     val document = Jsoup.parse(html, upstream)
     val title = document.selectFirst("meta[property=og:title]")?.attr("content")
         ?.takeIf { it.isNotBlank() }
         ?: document.selectFirst("h1")?.text()
-        ?: "${UiMessages.app_untitledItem()} $threadId"
+        ?: "${UiMessages.app_untitledItem()} ${threadId.value}"
     val creator = document.selectFirst("a.username")?.text().orEmpty()
     val date = document.selectFirst("time.u-dt")?.text().orEmpty()
     val cover = document.select("[data-src], [data-url]")
@@ -37,14 +37,14 @@ internal fun parseThreadDetail(threadId: String, html: String): ThreadDetail {
     }
 
     return ThreadDetail(
-        threadId = F95ThreadId(threadId),
+        threadId = threadId,
         title = F95GameTitle(htmlText(title)),
         creator = F95DeveloperName(creator),
         date = F95DateLabel(date),
         cover = F95CoverUrl(proxyMediaUrl(cover)),
         meta = meta,
-        overviewHtml = F95Html(sanitizeThreadHtml(parsedBody.overview)),
-        sections = sections.map { it.copy(html = F95Html(sanitizeThreadHtml(it.html.value))) },
-        bodyHtml = F95Html(sanitizeThreadHtml(body))
+        overviewHtml = F95Html(sanitizeThreadHtml(parsedBody.overview).value),
+        sections = sections.map { it.copy(html = F95Html(sanitizeThreadHtml(it.html.value).value)) },
+        bodyHtml = F95Html(sanitizeThreadHtml(body).value)
     )
 }

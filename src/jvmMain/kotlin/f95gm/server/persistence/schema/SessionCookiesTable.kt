@@ -11,4 +11,8 @@ internal object SessionCookiesTable : Table("session_cookies") {
     val value = varchar("value", ServerConstants.COOKIE_VALUE_LENGTH)
 
     override val primaryKey = PrimaryKey(sessionId, name)
+
+    init {
+        index("session_cookies_name_idx", false, name)
+    }
 }

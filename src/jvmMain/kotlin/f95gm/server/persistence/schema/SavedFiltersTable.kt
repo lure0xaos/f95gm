@@ -20,6 +20,10 @@ internal object SavedFiltersTable : Table("saved_filters") {
     val dateLimit = integer("date_limit")
     val updatedAt = long("updated_at")
 
+    init {
+        index("saved_filters_account_updated_at_idx", false, accountKey, updatedAt)
+    }
+
     override val primaryKey = PrimaryKey(id)
 
     init {

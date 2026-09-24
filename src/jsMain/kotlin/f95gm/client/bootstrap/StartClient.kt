@@ -10,9 +10,7 @@ import f95gm.client.actions.runtime.startJvmConnectionMonitor
 import f95gm.client.model.feedback.ToastState
 import f95gm.client.routing.navigation.router
 import f95gm.client.state.feedback.toast
-import f95gm.client.state.runtime.BrowserTabId
-import f95gm.client.state.runtime.jvmConnection
-import f95gm.client.state.runtime.scope
+import f95gm.client.state.runtime.*
 import f95gm.client.state.session.session
 import f95gm.client.state.settings.appSettings
 import f95gm.client.ui.detail.gallery.detailGallery
@@ -28,13 +26,15 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 internal fun startClient() {
+    startClientScope()
     loadBootstrapAssets()
     addGlobalStyles(applicationStyles)
     startJvmConnectionMonitor()
     document.title = UiMessages.app_pageTitle()
     render {
         Window.pagehides handledBy {
-            navigator.sendBeacon("${F95Api.SHUTDOWN}?${F95Api.TAB_ID}=${BrowserTabId.value}").run { }
+            navigator.sendBeacon("${F95Api.SHUTDOWN}?${F95Api.TAB_ID}=${BrowserTabId.value}")
+            cancelClientScope()
         }
         div("app-shell bg-black min-vh-100") {
             attr("data-bs-theme", appSettings.data.map { it.theme.bootstrapValue })

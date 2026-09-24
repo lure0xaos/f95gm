@@ -16,8 +16,7 @@ import kotlinx.coroutines.flow.map
 
 internal fun RenderContext.gameCard(game: Game) {
     a("game-link col d-flex text-decoration-none text-reset") {
-        attr("style", "cursor: pointer;")
-        clicks.map { latestUpdatesDetailRoute(game.threadId.value) } handledBy router.navTo
+        clicks.map { latestUpdatesDetailRoute(game.threadId) } handledBy router.navTo
         div("game-card card h-100 w-100 d-flex flex-column shadow-sm overflow-hidden") {
             catalogOptions.data.render { options ->
                 gameCardContent(

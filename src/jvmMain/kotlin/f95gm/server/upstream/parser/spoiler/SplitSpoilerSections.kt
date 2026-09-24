@@ -8,7 +8,7 @@ import f95gm.server.upstream.parser.extractNestedSections
 import f95gm.server.upstream.parser.htmlText
 import org.jsoup.Jsoup
 
-internal fun splitSpoilerSections(section: DetailSection, discardNonSpoilerContent: Boolean): List<DetailSection> {
+internal fun splitSpoilerSections(section: DetailSection, contentMode: SpoilerContentMode): List<DetailSection> {
     val body = Jsoup.parseBodyFragment(section.html.value, upstream).body()
     val extractedSections = extractNestedSections(body)
     val spoilers = body.select("div.bbCodeSpoiler").filter { spoiler ->
@@ -31,7 +31,7 @@ internal fun splitSpoilerSections(section: DetailSection, discardNonSpoilerConte
     }
 
     val result = mutableListOf<DetailSection>()
-    if (!discardNonSpoilerContent) {
+    if (contentMode == SpoilerContentMode.KEEP_NON_SPOILER_CONTENT) {
         val remaining = body.clone()
         remaining.select("div.bbCodeSpoiler").remove()
         remaining.select("b").filter { spoilerHeading(it) != null }.forEach { it.remove() }

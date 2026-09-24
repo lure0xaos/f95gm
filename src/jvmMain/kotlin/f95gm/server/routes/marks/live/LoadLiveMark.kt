@@ -6,12 +6,31 @@ import f95gm.domain.values.F95MetricText
 import f95gm.domain.values.F95ThreadId
 import f95gm.server.model.auth.UpstreamSession
 import f95gm.server.model.marks.LiveMarkInfo
+import f95gm.server.state.runtime.RouteDependencies
 
-internal suspend fun loadLiveMark(threadId: F95ThreadId, session: UpstreamSession): LiveMarkInfo {
-    val detail = fetchThreadDetail(threadId.value, session)
+internal suspend fun loadLiveMark(
+    context: RouteDependencies,
+    threadId: F95ThreadId,
+    session: UpstreamSession
+): LiveMarkInfo {
+    return context.liveMarkCache.getOrPutSuspending(threadId.value) {
+        loadLiveMarkUncached(context, threadId, session)
+    }
+}
+
+internal fun invalidateLiveMark(context: RouteDependencies, threadId: F95ThreadId) {
+    context.liveMarkCache.invalidate(threadId.value)
+}
+
+private suspend fun loadLiveMarkUncached(
+    context: RouteDependencies,
+    threadId: F95ThreadId,
+    session: UpstreamSession
+): LiveMarkInfo {
+    val detail = fetchThreadDetail(context, threadId, session)
     if (detail == null) return LiveMarkInfo.fallback(threadId)
 
-    return fetchCatalogInfo(detail.title.value, threadId.value, session)
+    return fetchCatalogInfo(context, detail.title.value, threadId, session)
         ?: LiveMarkInfo(
             threadId = threadId,
             title = detail.title,

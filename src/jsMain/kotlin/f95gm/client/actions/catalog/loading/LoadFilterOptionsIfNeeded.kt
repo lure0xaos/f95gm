@@ -10,8 +10,8 @@ import kotlinx.coroutines.launch
 internal fun loadFilterOptionsIfNeeded() {
     scope.launch {
         val category = catalog.data.first().category
-        if (loadedOptionsCategory == category.wireValue && catalogOptions.data.first().error.isBlank()) return@launch
-        loadedOptionsCategory = category.wireValue
+        if (loadedOptionsCategory == category && catalogOptions.data.first().error.isBlank()) return@launch
+        loadedOptionsCategory = category
         loadFilterOptions(category)
     }
 }

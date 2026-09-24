@@ -58,7 +58,6 @@ internal fun <T> RenderContext.paginationControls(
                                 attr("inputmode", "numeric")
                                 attr("aria-label", UiMessages.app_pageOf(state.page, state.totalPages))
                                 attr("autofocus", "true")
-                                attr("style", "width: 4rem")
                                 value(flowOf(state.pageInput))
                                 inputs.values() handledBy onPageInput
                                 keyupsIf { key == "Enter" } handledBy {

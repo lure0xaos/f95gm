@@ -1,3 +1,10 @@
 package f95gm.client.state.catalog
 
-internal var loadedOptionsCategory: String? = null
+import f95gm.client.state.runtime.clientController
+import f95gm.domain.filters.F95Category
+
+internal var loadedOptionsCategory: F95Category?
+    get() = clientController.loadedOptionsCategory()
+    set(value) {
+        clientController.setLoadedOptionsCategory(value)
+    }

@@ -6,7 +6,7 @@ import f95gm.server.upstream.media.proxyMediaUrl
 import f95gm.server.upstream.media.thumbnailMediaSource
 import org.jsoup.Jsoup
 
-internal fun sanitizeThreadHtml(html: String): String {
+internal fun sanitizeThreadHtml(html: String): SanitizedHtml {
     val document = Jsoup.parseBodyFragment(html, upstream)
     document.select("script, style, iframe, object, embed, form, button, noscript").remove()
     document.select("*").forEach { element ->
@@ -62,5 +62,5 @@ internal fun sanitizeThreadHtml(html: String): String {
         image.attr("loading", "lazy")
         image.attr("decoding", "async")
     }
-    return result.body().html().trim()
+    return SanitizedHtml(result.body().html().trim())
 }

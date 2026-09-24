@@ -7,14 +7,16 @@ import f95gm.server.config.filters.excludedPrefixesKind
 import f95gm.server.config.filters.excludedTagsKind
 import f95gm.server.config.filters.selectedPrefixesKind
 import f95gm.server.config.filters.selectedTagsKind
+import f95gm.server.model.EpochMillis
 import f95gm.server.model.filters.SavedFilter
-import f95gm.server.persistence.database.dbQuery
+import f95gm.server.persistence.database.DatabaseExecutor
 import f95gm.server.persistence.schema.SavedFilterOptionsTable
 import f95gm.server.persistence.schema.SavedFiltersTable
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.selectAll
 
-internal fun loadSavedFilters(account: F95AccountKey): List<SavedFilter> = dbQuery {
+internal suspend fun loadSavedFilters(database: DatabaseExecutor, account: F95AccountKey): List<SavedFilter> =
+    database.transactionSuspending {
     SavedFiltersTable.selectAll()
         .where { SavedFiltersTable.accountKey eq account.value }
         .mapNotNull { row ->
@@ -37,7 +39,7 @@ internal fun loadSavedFilters(account: F95AccountKey): List<SavedFilter> = dbQue
                     excludedPrefixes = optionsFor(options, excludedPrefixesKind),
                     tagType = row[SavedFiltersTable.tagType],
                     dateLimit = row[SavedFiltersTable.dateLimit],
-                    updatedAt = row[SavedFiltersTable.updatedAt]
+                    updatedAt = EpochMillis(row[SavedFiltersTable.updatedAt])
                 )
             )
         }

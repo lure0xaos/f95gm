@@ -23,7 +23,7 @@ internal fun RenderContext.responsiveNavbar(
         div("navbar-wrap w-100") {
             div("navbar-inner container-fluid px-0") {
                 div("navbar-row d-flex flex-wrap align-items-center w-100 gap-2 px-2") {
-                    navbarBrand(removeEndMargin = true)
+                    navbarBrand(NavbarBrandSpacing.COMPACT)
                     jvmConnectionDetails()
                     navbarReloadButton(page)
                     when (page) {

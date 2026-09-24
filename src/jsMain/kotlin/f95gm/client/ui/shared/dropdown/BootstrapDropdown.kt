@@ -66,9 +66,8 @@ internal fun RenderContext.bootstrapDropdown(
                 selectedLabel.render { +it }
             }
         }
-        ul {
+        ul("dropdown-menu-options") {
             className(dropdownMenuClass)
-            attr("style", "max-height: min(18rem, calc(100vh - 8rem));")
             visibleOptions.render { choices ->
                 if (choices.isEmpty()) {
                     li("dropdown-empty dropdown-item-text small text-body-secondary") { +UiMessages.app_noOptionsMatch() }

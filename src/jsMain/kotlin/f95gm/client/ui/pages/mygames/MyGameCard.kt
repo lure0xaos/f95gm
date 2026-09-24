@@ -19,6 +19,7 @@ import f95gm.client.ui.shared.dropdown.bootstrapDropdown
 import f95gm.client.ui.shared.navigation.dangerNavigationButtonClass
 import f95gm.client.ui.shared.navigation.primaryNavigationButtonClass
 import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
+import f95gm.domain.tracking.GameTrackingState
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -26,9 +27,8 @@ import kotlinx.coroutines.flow.map
 internal fun RenderContext.myGameCard(mark: MarkedGame) {
     div("game-column col d-flex") {
         div("game-card card h-100 w-100 d-flex flex-column shadow-sm overflow-hidden") {
-            attr("style", "cursor: pointer;")
             a("game-link text-decoration-none text-reset flex-grow-1") {
-                clicks.map { myGamesDetailRoute(mark.threadId.value) } handledBy router.navTo
+                clicks.map { myGamesDetailRoute(mark.threadId) } handledBy router.navTo
                 catalogOptions.data.render { options ->
                     gameCardContent(
                         card = GameCardData(
@@ -65,13 +65,20 @@ internal fun RenderContext.myGameCard(mark: MarkedGame) {
                     } + DropdownChoice("", UiMessages.app_unmark())),
                     buttonClass = "$secondaryNavigationButtonClass text-start flex-grow-1"
                 ) { selected ->
-                    if (selected.isBlank()) unmarkGame(mark.threadId.value) else saveMarkedTrackingState(mark, selected)
+                    if (selected.isBlank()) unmarkGame(mark.threadId)
+                    else GameTrackingState.fromWire(selected)?.let { saveMarkedTrackingState(mark, it) }
                 }
                 if (mark.updateAvailable) {
                     button(primaryNavigationButtonClass) {
                         type("button")
                         +UiMessages.app_downloaded(mark.latestVersion.value)
-                        clicks handledBy { saveMarkedTrackingState(mark, "downloaded", acknowledge = true) }
+                        clicks handledBy {
+                            saveMarkedTrackingState(
+                                mark,
+                                GameTrackingState.DOWNLOADED,
+                                acknowledge = true
+                            )
+                        }
                     }
                 }
                 button(dangerNavigationButtonClass) {
@@ -79,7 +86,7 @@ internal fun RenderContext.myGameCard(mark: MarkedGame) {
                     span("bi bi-trash") {}
                     attr("aria-label", UiMessages.app_remove())
                     title(UiMessages.app_remove())
-                    clicks handledBy { unmarkGame(mark.threadId.value) }
+                    clicks handledBy { unmarkGame(mark.threadId) }
                 }
             }
         }

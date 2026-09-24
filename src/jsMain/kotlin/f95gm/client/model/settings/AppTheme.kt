@@ -1,6 +1,6 @@
 package f95gm.client.model.settings
 
-import kotlinx.browser.window
+import f95gm.client.state.runtime.BrowserRuntime
 
 internal enum class AppTheme(val bootstrapValue: String) {
     DARK("dark"),
@@ -10,7 +10,7 @@ internal enum class AppTheme(val bootstrapValue: String) {
     fun desktopValue(): String = when (this) {
         DARK -> DARK.bootstrapValue
         LIGHT -> LIGHT.bootstrapValue
-        SYSTEM -> if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        SYSTEM -> if (BrowserRuntime.prefersDarkTheme()) {
             DARK.bootstrapValue
         } else {
             LIGHT.bootstrapValue

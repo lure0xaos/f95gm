@@ -50,7 +50,7 @@ internal object ConsoleWindow {
             margin = java.awt.Insets(8, 8, 8, 8)
         }
         output.attach(textArea)
-        return JFrame("F95GM Console").apply {
+        return JFrame("F95 Game Manager Console").apply {
             defaultCloseOperation = JFrame.HIDE_ON_CLOSE
             add(JScrollPane(textArea).apply {
                 background = Color.BLACK

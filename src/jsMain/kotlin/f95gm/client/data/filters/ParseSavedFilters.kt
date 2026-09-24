@@ -8,6 +8,7 @@ import f95gm.domain.filters.F95Category
 import f95gm.domain.filters.F95SearchMode
 import f95gm.domain.filters.F95Sort
 import f95gm.domain.filters.F95TagType
+import f95gm.domain.values.F95EpochMillis
 import f95gm.domain.values.F95FilterId
 import f95gm.domain.values.F95OptionName
 import f95gm.messages.UiMessages
@@ -30,6 +31,6 @@ internal fun parseSavedFilters(payload: String): List<SavedFilter> =
             excludedPrefixes = parseSavedPrefixOptions(item, "excludedPrefixes"),
             tagType = F95TagType.fromWire(item.string("tagType", F95Defaults.DEFAULT_TAG_TYPE)),
             dateLimit = item["dateLimit"]?.jsonPrimitive?.intOrNull ?: F95Defaults.ANY_DATE,
-            updatedAt = item["updatedAt"]?.jsonPrimitive?.longOrNull ?: 0L
+            updatedAt = F95EpochMillis(item["updatedAt"]?.jsonPrimitive?.longOrNull ?: 0L)
         )
     }

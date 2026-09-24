@@ -8,7 +8,7 @@ import f95gm.client.actions.detail.loadDetailIfNeeded
 import f95gm.client.actions.detail.retryDetail
 import f95gm.client.actions.filters.loadSavedFiltersIfNeeded
 import f95gm.client.model.detail.DetailBodyState
-import f95gm.client.routing.navigation.Route
+import f95gm.client.routing.navigation.TypedRoute
 import f95gm.client.routing.navigation.router
 import f95gm.client.state.config.ClientConstants
 import f95gm.client.state.detail.detail
@@ -19,11 +19,12 @@ import f95gm.client.ui.detail.metadata.detailMetaCards
 import f95gm.client.ui.detail.renderDetailBody
 import f95gm.client.ui.navigation.*
 import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
+import f95gm.domain.values.F95ThreadId
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.detailPage(threadId: String, backRoute: Route) {
+internal fun RenderContext.detailPage(threadId: String, backRoute: TypedRoute) {
     div("detail-page container-xl") {
         div("detail-nav navbar border-bottom py-3") {
             navbarBrand()
@@ -54,7 +55,7 @@ internal fun RenderContext.detailPage(threadId: String, backRoute: Route) {
                         button("btn btn-sm btn-outline-danger") {
                             type("button")
                             +UiMessages.app_retry()
-                            clicks handledBy { retryDetail(threadId) }
+                            clicks handledBy { retryDetail(F95ThreadId(threadId)) }
                         }
                     }
                     else -> {
@@ -157,6 +158,6 @@ internal fun RenderContext.detailPage(threadId: String, backRoute: Route) {
             }
         }
     }
-    loadDetailIfNeeded(threadId)
+    loadDetailIfNeeded(F95ThreadId(threadId))
     loadSavedFiltersIfNeeded()
 }

@@ -29,6 +29,6 @@ internal fun marksJson(
         storedVersion = mark.storedVersion,
         latestVersion = F95GameVersion(latestVersion),
         updateAvailable = isNewerVersion(latestVersion, mark.storedVersion.value),
-        updatedAt = mark.updatedAt
+        updatedAt = mark.updatedAt.value
     )
 })

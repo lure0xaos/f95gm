@@ -1,0 +1,27 @@
+package f95gm.domain.api
+
+/** HTTP statuses that can appear in the shared API contract. */
+enum class F95ApiStatus(val code: Int) {
+    OK(200),
+    ACCEPTED(202),
+    BAD_REQUEST(400),
+    UNAUTHORIZED(401),
+    FORBIDDEN(403),
+    NOT_FOUND(404),
+    CONFLICT(409),
+    PAYLOAD_TOO_LARGE(413),
+    UNSUPPORTED_MEDIA_TYPE(415),
+    TOO_MANY_REQUESTS(429),
+    INTERNAL_SERVER_ERROR(500),
+    BAD_GATEWAY(502),
+    SERVICE_UNAVAILABLE(503),
+    GATEWAY_TIMEOUT(504);
+
+    companion object {
+        val DEFAULT_ERROR_STATUSES: Set<F95ApiStatus> = setOf(
+            BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, PAYLOAD_TOO_LARGE,
+            UNSUPPORTED_MEDIA_TYPE, TOO_MANY_REQUESTS, INTERNAL_SERVER_ERROR, BAD_GATEWAY,
+            SERVICE_UNAVAILABLE, GATEWAY_TIMEOUT
+        )
+    }
+}

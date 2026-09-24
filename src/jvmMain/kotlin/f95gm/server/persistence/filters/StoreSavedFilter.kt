@@ -7,15 +7,42 @@ import f95gm.server.config.filters.excludedTagsKind
 import f95gm.server.config.filters.selectedPrefixesKind
 import f95gm.server.config.filters.selectedTagsKind
 import f95gm.server.model.filters.SavedFilter
-import f95gm.server.persistence.database.dbQuery
+import f95gm.server.persistence.ConditionalWriteResult
+import f95gm.server.persistence.database.DatabaseExecutor
+import f95gm.server.persistence.requireStorageLength
 import f95gm.server.persistence.schema.SavedFilterOptionsTable
 import f95gm.server.persistence.schema.SavedFiltersTable
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 
-internal fun storeSavedFilter(account: F95AccountKey, filter: SavedFilter): SavedFilter = dbQuery {
+internal suspend fun storeSavedFilterIfCurrent(
+    database: DatabaseExecutor,
+    account: F95AccountKey,
+    filter: SavedFilter,
+    expectedUpdatedAt: Long?
+): ConditionalWriteResult<SavedFilter> = database.transactionSuspending {
+    val current = SavedFiltersTable.selectAll()
+        .where { SavedFiltersTable.id eq filter.id.value }
+        .singleOrNull()
+        ?.get(SavedFiltersTable.updatedAt)
+    if (expectedUpdatedAt != null && current != expectedUpdatedAt) return@transactionSuspending ConditionalWriteResult.Conflict
+    ConditionalWriteResult.Stored(storeSavedFilterInTransaction(account, filter))
+}
+
+internal suspend fun storeSavedFilter(
+    database: DatabaseExecutor,
+    account: F95AccountKey,
+    filter: SavedFilter
+): SavedFilter = database.transactionSuspending {
+    storeSavedFilterInTransaction(account, filter)
+}
+
+private fun JdbcTransaction.storeSavedFilterInTransaction(account: F95AccountKey, filter: SavedFilter): SavedFilter {
     val storedFilter = filter.copy(id = uniqueFilterId(account, filter))
+    requireStorageLength(account.value, ServerConstants.ACCOUNT_KEY_LENGTH, "accountKey")
+    requireStorageLength(storedFilter.name.value, ServerConstants.FILTER_NAME_LENGTH, "filterName")
     SavedFiltersTable.selectAll()
         .where { SavedFiltersTable.accountKey eq account.value.take(ServerConstants.ACCOUNT_KEY_LENGTH) }
         .filter { it[SavedFiltersTable.name].equals(storedFilter.name.value, ignoreCase = true) }
@@ -32,7 +59,7 @@ internal fun storeSavedFilter(account: F95AccountKey, filter: SavedFilter): Save
         it[SavedFiltersTable.searchMode] = storedFilter.searchMode
         it[SavedFiltersTable.tagType] = storedFilter.tagType
         it[SavedFiltersTable.dateLimit] = storedFilter.dateLimit
-        it[SavedFiltersTable.updatedAt] = storedFilter.updatedAt
+        it[SavedFiltersTable.updatedAt] = storedFilter.updatedAt.value
     }
     listOf(
         selectedTagsKind to storedFilter.selectedTags,
@@ -50,5 +77,5 @@ internal fun storeSavedFilter(account: F95AccountKey, filter: SavedFilter): Save
             }
         }
     }
-    storedFilter
+    return storedFilter
 }

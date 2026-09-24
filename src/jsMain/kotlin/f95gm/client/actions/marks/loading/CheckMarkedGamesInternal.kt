@@ -1,6 +1,8 @@
 package f95gm.client.actions.marks.loading
 
 import f95gm.client.actions.feedback.showToast
+import f95gm.client.data.api.apiResult
+import f95gm.client.data.api.apiUserMessage
 import f95gm.client.data.api.getJson
 import f95gm.client.data.marks.parseMarks
 import f95gm.client.model.marks.markedGamesView
@@ -10,9 +12,9 @@ import f95gm.domain.api.F95Api
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.first
 
-internal suspend fun checkMarkedGamesInternal(notify: Boolean) {
+internal suspend fun checkMarkedGamesInternal(notification: MarkCheckNotification) {
     marks.enqueue { it.copy(loading = it.items.isEmpty(), checking = true, error = "") }
-    runCatching {
+    apiResult {
         parseMarks(getJson(F95Api.MARKS_CHECK))
     }.onSuccess { checked ->
         val marked = checked.map { game ->
@@ -29,7 +31,7 @@ internal suspend fun checkMarkedGamesInternal(notify: Boolean) {
             )
             next.copy(page = markedGamesView(next).page)
         }
-        if (notify) {
+        if (notification == MarkCheckNotification.SHOW_TOAST) {
             val newlyAvailable = marked.filter {
                 it.updateAvailable && previous[it.threadId]?.updateAvailable != true
             }
@@ -49,7 +51,7 @@ internal suspend fun checkMarkedGamesInternal(notify: Boolean) {
             it.copy(
                 loading = false,
                 checking = false,
-                error = error.message ?: UiMessages.app_markedGamesCheckFailed()
+                error = error.apiUserMessage(UiMessages.app_markedGamesCheckFailed())
             )
         }
     }
