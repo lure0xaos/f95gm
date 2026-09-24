@@ -1,5 +1,6 @@
 package f95gm.server.upstream.request
 
+import f95gm.server.config.Millis
 import f95gm.server.config.constants.ServerConstants
 import f95gm.server.config.logging.UpstreamRetryEvent
 import f95gm.server.config.logging.logger
@@ -67,7 +68,7 @@ internal class UpstreamTransport(
                     metrics.recordRetry()
                     response.bodyAsChannel().cancel(null)
                     RetryDecision.Again(
-                        f95gm.server.config.Millis(
+                        Millis(
                             retryPolicy.httpDelay(
                                 response.headers,
                                 attempt
@@ -89,7 +90,7 @@ internal class UpstreamTransport(
                 }
                 lastRetryReason = UpstreamRetryReason.IO_EXCEPTION
                 metrics.recordRetry()
-                RetryDecision.Again(f95gm.server.config.Millis(retryPolicy.ioDelay(attempt).inWholeMilliseconds))
+                RetryDecision.Again(Millis(retryPolicy.ioDelay(attempt).inWholeMilliseconds))
             }
         }
     }

@@ -28,7 +28,7 @@ internal class ServerContext(
     val mutationService get() = services.mutationService
     override val upstream: UpstreamGateway
         get() {
-            check(!services.isClosed()) { "Server context is closed" }
+            check(!services.isClosed) { "Server context is closed" }
             return services.upstream
         }
     override val sessionService get() = services.sessionService

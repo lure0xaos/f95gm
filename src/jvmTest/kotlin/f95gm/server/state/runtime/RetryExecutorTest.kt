@@ -1,5 +1,6 @@
 package f95gm.server.state.runtime
 
+import f95gm.server.config.Millis
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -54,7 +55,7 @@ class RetryExecutorTest {
             pause = delays::add,
             operation = { attempt ->
                 calls++
-                if (attempt == 0) RetryDecision.Again(f95gm.server.config.Millis(-50))
+                if (attempt == 0) RetryDecision.Again(Millis(-50))
                 else RetryDecision.Return("ok")
             }
         )
@@ -80,7 +81,7 @@ class RetryExecutorTest {
         assertFailsWith<CancellationException> {
             retrySuspending<String>(3, pause = { throw CancellationException("shutdown") }) {
                 calls++
-                RetryDecision.Again(f95gm.server.config.Millis(1))
+                RetryDecision.Again(Millis(1))
             }
         }
         assertEquals(1, calls)

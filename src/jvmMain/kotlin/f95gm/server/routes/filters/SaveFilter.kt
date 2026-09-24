@@ -10,6 +10,7 @@ import f95gm.server.persistence.ConditionalWriteResult
 import f95gm.server.persistence.filters.savedFiltersJson
 import f95gm.server.persistence.filters.toSavedFilter
 import f95gm.server.routes.session.requireBrowserSession
+import f95gm.server.state.runtime.IdempotencyRegistry
 import f95gm.server.state.runtime.routeDependencies
 import io.ktor.server.application.*
 
@@ -19,8 +20,8 @@ internal suspend fun saveFilter(call: ApplicationCall) {
     val mutationKey = idempotencyKey?.value?.let { "filter:${session.accountKey.value}:$it" }
     val body = call.receiveLimitedText(ServerConstants.MAX_REQUEST_BODY_BYTES)
     val request = when (val decoded = decodeJson<SavedFilterRequest>(body)) {
-        is f95gm.server.http.request.RequestValidation.Valid -> decoded.value
-        is f95gm.server.http.request.RequestValidation.Invalid -> {
+        is RequestValidation.Valid -> decoded.value
+        is RequestValidation.Invalid -> {
             respondFailure(
                 call,
                 ServerConstants.STATUS_BAD_REQUEST,
@@ -64,7 +65,7 @@ internal suspend fun saveFilter(call: ApplicationCall) {
         val storedFilter = (writeResult as ConditionalWriteResult.Stored).value
         val responseBody = savedFiltersJson(listOf(storedFilter))
         it.complete(
-            f95gm.server.state.runtime.IdempotencyRegistry.CachedResponse(
+            IdempotencyRegistry.CachedResponse(
                 ServerConstants.STATUS_OK.value,
                 responseBody,
                 null

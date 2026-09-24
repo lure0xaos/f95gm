@@ -25,7 +25,7 @@ internal fun Route.configureHealthRoute(
     live(F95Api.LIVE)
     get(F95Api.READY) {
         call.response.headers.append(HttpHeaders.CacheControl, "no-store")
-        if (shutdownController().isDraining()) call.respond(HttpStatusCode.ServiceUnavailable)
+        if (shutdownController().isDraining) call.respond(HttpStatusCode.ServiceUnavailable)
         else call.respond(ServerConstants.STATUS_OK)
     }
     get(F95Api.METRICS) {

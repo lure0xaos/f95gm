@@ -19,7 +19,7 @@ class ServerLifecycleTest {
         lifecycle.close()
 
         assertEquals(listOf("second", "first"), closed)
-        assertEquals(true, lifecycle.isClosed())
+        assertEquals(true, lifecycle.isClosed)
     }
 
     @Test
@@ -58,7 +58,7 @@ class ServerLifecycleTest {
         check(executor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS))
         lifecycle.close()
 
-        assertEquals(true, lifecycle.isClosed())
+        assertEquals(true, lifecycle.isClosed)
         assertEquals(registered.get(), closes.get())
     }
 

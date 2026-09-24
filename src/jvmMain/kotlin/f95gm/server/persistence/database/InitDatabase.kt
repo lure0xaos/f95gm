@@ -4,14 +4,10 @@ import f95gm.server.config.ServerConfig
 import f95gm.server.config.logging.logger
 import org.jetbrains.exposed.v1.jdbc.Database
 import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
-import kotlin.io.path.absolutePathString
-import kotlin.io.path.createDirectories
-import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
+import kotlin.io.path.*
 
 internal class DatabaseInitializationFailure(cause: Exception) :
     IllegalStateException("Database initialization failed", cause)
@@ -52,10 +48,10 @@ private const val DATABASE_BACKUP_GENERATIONS = 3
 
 internal fun createDatabaseBackup(databaseFile: Path, backupFile: Path) {
     val parent = databaseFile.parent ?: error("Database file must have a parent directory")
-    val temporary = Files.createTempFile(parent, "${databaseFile.fileName}.", ".backup.tmp")
+    val temporary = createTempFile(parent, "${databaseFile.fileName}.", ".backup.tmp")
     try {
-        Files.copy(databaseFile, temporary, REPLACE_EXISTING)
-        check(Files.size(temporary) == Files.size(databaseFile)) {
+        databaseFile.copyTo(temporary, overwrite = true)
+        check(temporary.fileSize() == databaseFile.fileSize()) {
             "Database backup size does not match the source database"
         }
         for (generation in DATABASE_BACKUP_GENERATIONS - 1 downTo 1) {
@@ -65,7 +61,7 @@ internal fun createDatabaseBackup(databaseFile: Path, backupFile: Path) {
         }
         if (backupFile.exists()) moveReplacing(backupFile, generationPath(backupFile, 1))
         moveReplacing(temporary, backupFile)
-        check(Files.size(backupFile) == Files.size(databaseFile)) {
+        check(backupFile.fileSize() == databaseFile.fileSize()) {
             "Database backup validation failed after atomic replacement"
         }
     } finally {
@@ -78,8 +74,8 @@ private fun generationPath(backupFile: Path, generation: Int): Path =
 
 private fun moveReplacing(source: Path, target: Path) {
     try {
-        Files.move(source, target, ATOMIC_MOVE, REPLACE_EXISTING)
+        source.moveTo(target, ATOMIC_MOVE, REPLACE_EXISTING)
     } catch (_: AtomicMoveNotSupportedException) {
-        Files.move(source, target, REPLACE_EXISTING)
+        source.moveTo(target, REPLACE_EXISTING)
     }
 }

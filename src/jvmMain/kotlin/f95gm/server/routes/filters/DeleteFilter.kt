@@ -8,6 +8,7 @@ import f95gm.server.http.request.validIdempotencyKey
 import f95gm.server.http.response.*
 import f95gm.server.model.http.OkResponse
 import f95gm.server.routes.session.requireBrowserSession
+import f95gm.server.state.runtime.IdempotencyRegistry
 import f95gm.server.state.runtime.routeDependencies
 import io.ktor.server.application.*
 
@@ -29,7 +30,7 @@ internal suspend fun deleteFilter(call: ApplicationCall) {
         call.routeDependencies.applicationServices.savedFilters.remove(session.accountKey, filterId)
         val responseBody = encodeJson(OkResponse(true))
         it.complete(
-            f95gm.server.state.runtime.IdempotencyRegistry.CachedResponse(
+            IdempotencyRegistry.CachedResponse(
                 ServerConstants.STATUS_OK.value,
                 responseBody,
                 null

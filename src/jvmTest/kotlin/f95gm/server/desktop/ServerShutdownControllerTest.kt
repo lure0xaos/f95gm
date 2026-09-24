@@ -17,7 +17,7 @@ class ServerShutdownControllerTest {
         val stopped = CountDownLatch(1)
         val controller = ServerShutdownController(stopped::countDown)
         controller.request()
-        assertTrue(controller.isDraining())
+        assertTrue(controller.isDraining)
         assertTrue(stopped.await(1, TimeUnit.SECONDS))
         controller.close()
     }
@@ -31,7 +31,7 @@ class ServerShutdownControllerTest {
         controller.request()
 
         assertTrue(stopped.await(1, TimeUnit.SECONDS))
-        assertTrue(controller.isDraining())
+        assertTrue(controller.isDraining)
         assertEquals(1, stops.get())
         controller.close()
     }
@@ -56,7 +56,7 @@ class ServerShutdownControllerTest {
         val lease = tracker.enter()
         try {
             controller.request()
-            assertTrue(controller.isDraining())
+            assertTrue(controller.isDraining)
             assertFalse(stopped.await(100, TimeUnit.MILLISECONDS))
             lease.close()
             assertTrue(stopped.await(1, TimeUnit.SECONDS))

@@ -1,10 +1,10 @@
 package f95gm.server.http.request
 
-import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.uuid.Uuid
 
 class RequestIdentifiersTest {
     @Test
@@ -33,7 +33,7 @@ class RequestIdentifiersTest {
 
     @Test
     fun identifierFactoryAllowsDeterministicUuidInjection() {
-        val factory = RequestIdentifierFactory { UUID.fromString("00000000-0000-0000-0000-000000000001") }
+        val factory = RequestIdentifierFactory { Uuid.parse("00000000-0000-0000-0000-000000000001") }
 
         assertEquals("00000000-0000-0000-0000-000000000001", factory.requestIds.next().value)
         assertEquals("00000000-0000-0000-0000-000000000001", factory.shutdownTokens.next().value)

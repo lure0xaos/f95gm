@@ -1,6 +1,8 @@
 package f95gm.client.state.runtime
 
 import f95gm.domain.filters.F95Category
+import f95gm.domain.values.F95FilterId
+import f95gm.domain.values.F95ThreadId
 import kotlinx.coroutines.*
 
 private fun newClientScope() = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -8,7 +10,7 @@ private fun newClientScope() = CoroutineScope(SupervisorJob() + Dispatchers.Main
 internal class ClientController {
     private var clientScope = newClientScope()
     private var lifecycle = ClientLifecycleState()
-    private var healthProbeNumber = 0
+    private var probeNumber = 0
     private var jobs = ClientJobRegistry()
 
     val scope: CoroutineScope get() = clientScope
@@ -30,37 +32,44 @@ internal class ClientController {
         clientScope = newClientScope()
     }
 
-    fun isSessionLoaded(): Boolean = isLoaded(ClientLoadState.SESSION)
-    fun setSessionLoaded(value: Boolean) = setLoaded(ClientLoadState.SESSION, value)
+    var sessionLoaded: Boolean
+        get() = isLoaded(ClientLoadState.SESSION)
+        set(value) = setLoaded(ClientLoadState.SESSION, value)
     fun markSessionLoaded() = setLoaded(ClientLoadState.SESSION, true)
     fun clearSession() = resetSessionLifecycle()
-    fun loadedDetailId(): f95gm.domain.values.F95ThreadId? = lifecycle.detailId
-    fun setLoadedDetailId(value: f95gm.domain.values.F95ThreadId?) {
-        lifecycle = lifecycle.copy(detailId = value)
-    }
+    var loadedDetailId: F95ThreadId?
+        get() = lifecycle.detailId
+        set(value) {
+            lifecycle = lifecycle.copy(detailId = value)
+        }
 
-    fun loadedOptionsCategory(): F95Category? = lifecycle.optionsCategory
-    fun setLoadedOptionsCategory(value: F95Category?) {
-        lifecycle = lifecycle.copy(optionsCategory = value)
-    }
+    var loadedOptionsCategory: F95Category?
+        get() = lifecycle.optionsCategory
+        set(value) {
+            lifecycle = lifecycle.copy(optionsCategory = value)
+        }
 
-    fun areMarksLoaded(): Boolean = isLoaded(ClientLoadState.MARKS)
-    fun setMarksLoaded(value: Boolean) = setLoaded(ClientLoadState.MARKS, value)
+    var marksLoaded: Boolean
+        get() = isLoaded(ClientLoadState.MARKS)
+        set(value) = setLoaded(ClientLoadState.MARKS, value)
     fun markMarksLoaded() = setLoaded(ClientLoadState.MARKS, true)
     fun clearMarks() = setLoaded(ClientLoadState.MARKS, false)
-    fun areSavedFiltersLoaded(): Boolean = isLoaded(ClientLoadState.SAVED_FILTERS)
-    fun setSavedFiltersLoaded(value: Boolean) = setLoaded(ClientLoadState.SAVED_FILTERS, value)
+    var savedFiltersLoaded: Boolean
+        get() = isLoaded(ClientLoadState.SAVED_FILTERS)
+        set(value) = setLoaded(ClientLoadState.SAVED_FILTERS, value)
     fun markSavedFiltersLoaded() = setLoaded(ClientLoadState.SAVED_FILTERS, true)
     fun clearSavedFilters() = setLoaded(ClientLoadState.SAVED_FILTERS, false)
-    fun appliedFilterId(): f95gm.domain.values.F95FilterId? = lifecycle.appliedFilterId
-    fun setAppliedFilterId(value: f95gm.domain.values.F95FilterId?) {
-        lifecycle = lifecycle.copy(appliedFilterId = value)
-    }
+    var appliedFilterId: F95FilterId?
+        get() = lifecycle.appliedFilterId
+        set(value) {
+            lifecycle = lifecycle.copy(appliedFilterId = value)
+        }
 
-    fun healthProbeNumber(): Int = healthProbeNumber
-    fun setHealthProbeNumber(value: Int) {
-        healthProbeNumber = value
-    }
+    var healthProbeNumber: Int
+        get() = probeNumber
+        set(value) {
+            probeNumber = value
+        }
 
     fun resetSessionLifecycle() {
         lifecycle = ClientLifecycleState()

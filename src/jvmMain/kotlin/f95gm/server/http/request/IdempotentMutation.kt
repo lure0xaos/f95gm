@@ -3,6 +3,7 @@ package f95gm.server.http.request
 import f95gm.messages.UiMessages
 import f95gm.server.config.constants.ServerConstants
 import f95gm.server.config.logging.*
+import f95gm.server.http.response.ServerMessageKeys
 import f95gm.server.http.response.respondApiFailure
 import f95gm.server.http.response.respondCached
 import f95gm.server.state.runtime.IdempotencyRegistry
@@ -55,9 +56,9 @@ internal suspend fun ApplicationCall.beginIdempotentMutation(
     }
     if (!mutations.claim(key, digest)) {
         val messageKey = if (mutations.hasFingerprintMismatch(key, digest)) {
-            f95gm.server.http.response.ServerMessageKeys.IDEMPOTENCY_KEY_REUSED
+            ServerMessageKeys.IDEMPOTENCY_KEY_REUSED
         } else {
-            f95gm.server.http.response.ServerMessageKeys.MUTATION_IN_PROGRESS
+            ServerMessageKeys.MUTATION_IN_PROGRESS
         }
         val message = if (routeDependencies.applicationServices.mutations.hasFingerprintMismatch(key, digest)) {
             UiMessages.server_idempotencyKeyReused()

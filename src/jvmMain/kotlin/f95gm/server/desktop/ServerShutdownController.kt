@@ -90,7 +90,7 @@ internal class ServerShutdownController(
         }
     }
 
-    fun isDraining(): Boolean = state != ShutdownState.RUNNING
+    val isDraining: Boolean get() = state != ShutdownState.RUNNING
 
     fun close() {
         synchronized(lock) {

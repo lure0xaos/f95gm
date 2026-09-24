@@ -1,5 +1,6 @@
 package f95gm.server.http.response
 
+import f95gm.domain.api.F95ApiError
 import f95gm.domain.api.F95ApiErrorCode
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -22,7 +23,7 @@ class ApiFailureDetailsTest {
             code = F95ApiErrorCode.INVALID_INPUT,
             details = mapOf("field" to "body")
         )
-        val decoded = Json.decodeFromString<f95gm.domain.api.F95ApiError>(encoded)
+        val decoded = Json.decodeFromString<F95ApiError>(encoded)
 
         assertEquals("Bad request", decoded.message)
         assertEquals(F95ApiErrorCode.INVALID_INPUT, decoded.code)

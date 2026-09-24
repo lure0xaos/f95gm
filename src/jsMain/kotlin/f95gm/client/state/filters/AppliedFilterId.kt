@@ -4,7 +4,7 @@ import f95gm.client.state.runtime.clientController
 import f95gm.domain.values.F95FilterId
 
 internal var appliedFilterId: F95FilterId?
-    get() = clientController.appliedFilterId()
+    get() = clientController.appliedFilterId
     set(value) {
-        clientController.setAppliedFilterId(value)
+        clientController.appliedFilterId = value
     }

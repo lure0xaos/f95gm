@@ -1,22 +1,22 @@
 package f95gm.server.persistence.database
 
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import kotlin.io.path.*
 
 /** Restores one backup generation without exposing a partially copied database file. */
 internal fun restoreDatabaseBackup(backupFile: Path, databaseFile: Path, overwrite: Boolean = false) {
-    require(Files.isRegularFile(backupFile)) { "Database backup does not exist: $backupFile" }
-    require(overwrite || !Files.exists(databaseFile)) { "Refusing to overwrite existing database: $databaseFile" }
-    Files.createDirectories(databaseFile.parent ?: Path.of("."))
-    val temporary = Files.createTempFile(databaseFile.parent, databaseFile.fileName.toString(), ".restore.tmp")
+    require(backupFile.isRegularFile()) { "Database backup does not exist: $backupFile" }
+    require(overwrite || !databaseFile.exists()) { "Refusing to overwrite existing database: $databaseFile" }
+    (databaseFile.parent ?: Path.of(".")).createDirectories()
+    val temporary = createTempFile(databaseFile.parent, databaseFile.fileName.toString(), ".restore.tmp")
     try {
-        Files.copy(backupFile, temporary, REPLACE_EXISTING)
-        if (overwrite) Files.move(temporary, databaseFile, ATOMIC_MOVE, REPLACE_EXISTING)
-        else Files.move(temporary, databaseFile, ATOMIC_MOVE)
+        backupFile.copyTo(temporary, overwrite = true)
+        if (overwrite) temporary.moveTo(databaseFile, ATOMIC_MOVE, REPLACE_EXISTING)
+        else temporary.moveTo(databaseFile, ATOMIC_MOVE)
     } finally {
-        Files.deleteIfExists(temporary)
+        temporary.deleteIfExists()
     }
 }
 

@@ -76,6 +76,6 @@ internal class ServerContextServices(
         lifecycle.register(AutoCloseable { sessionEvictionJob.cancel() })
     }
 
-    fun isClosed(): Boolean = lifecycle.isClosed()
+    val isClosed: Boolean get() = lifecycle.isClosed
     override fun close() = lifecycle.close()
 }

@@ -14,6 +14,7 @@ import f95gm.server.http.request.origin.OriginValidationCache
 import f95gm.server.http.request.ratelimit.RateLimitHeaders
 import f95gm.server.http.request.ratelimit.RateLimitPolicy
 import f95gm.server.http.request.ratelimit.RequestRateLimiter
+import f95gm.server.http.response.ApiApplicationException
 import f95gm.server.http.response.ApiCsrfException
 import f95gm.server.http.response.ApiRateLimitedException
 import f95gm.server.http.response.ApiRequestTooLargeException
@@ -81,7 +82,7 @@ private fun Application.installRequestMonitoringWithPolicy(
         var failure: Throwable? = null
         var metricEndpoint = "unmatched"
         try {
-            if (shutdownController().isDraining() && !call.isPublicDuringDrain()) {
+            if (shutdownController().isDraining && !call.isPublicDuringDrain()) {
                 call.respond(ServerConstants.STATUS_SERVICE_UNAVAILABLE)
                 finish()
                 return@intercept
@@ -157,7 +158,9 @@ private fun Application.installRequestMonitoringWithPolicy(
                         status = call.response.status()?.value ?: "-",
                         durationMs = duration,
                         outcome = if (failure == null) "success" else "error",
-                        errorType = failure?.javaClass?.simpleName
+                        errorType = failure?.let {
+                            (it as? ApiApplicationException)?.code?.name?.lowercase() ?: "request_failed"
+                        }
                     )
                 )
             }

@@ -10,6 +10,7 @@ import f95gm.domain.values.F95OptionName
 import f95gm.server.config.constants.ServerConstants
 import f95gm.server.config.filters.filterCategories
 import f95gm.server.config.filters.filterSorts
+import f95gm.server.model.EpochMillis
 import f95gm.server.model.filters.SavedFilter
 import f95gm.server.model.filters.SavedFilterRequest
 import f95gm.server.persistence.filters.alias.filterAlias
@@ -32,6 +33,6 @@ internal fun SavedFilterRequest.toSavedFilter(clock: ServerClock): SavedFilter? 
         excludedPrefixes = sanitizeSavedFilterOptions(excludedPrefixes),
         tagType = tagType.takeIf { it == F95TagType.AND } ?: F95TagType.OR,
         dateLimit = dateLimit.coerceIn(F95Defaults.ANY_DATE, F95Defaults.MAX_DATE_DAYS),
-        updatedAt = f95gm.server.model.EpochMillis(clock.nowMillis())
+        updatedAt = EpochMillis(clock.nowMillis())
     )
 }

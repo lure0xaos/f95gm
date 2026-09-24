@@ -13,18 +13,18 @@ class ClientControllerTest {
     fun loadingStatesAreIndependentAndResetTogether() {
         val controller = ClientController()
 
-        controller.setSessionLoaded(true)
-        controller.setMarksLoaded(true)
+        controller.sessionLoaded = true
+        controller.marksLoaded = true
 
-        assertTrue(controller.isSessionLoaded())
-        assertTrue(controller.areMarksLoaded())
-        assertFalse(controller.areSavedFiltersLoaded())
+        assertTrue(controller.sessionLoaded)
+        assertTrue(controller.marksLoaded)
+        assertFalse(controller.savedFiltersLoaded)
 
         controller.resetSessionLifecycle()
 
-        assertFalse(controller.isSessionLoaded())
-        assertFalse(controller.areMarksLoaded())
-        assertFalse(controller.areSavedFiltersLoaded())
+        assertFalse(controller.sessionLoaded)
+        assertFalse(controller.marksLoaded)
+        assertFalse(controller.savedFiltersLoaded)
     }
 
     @Test

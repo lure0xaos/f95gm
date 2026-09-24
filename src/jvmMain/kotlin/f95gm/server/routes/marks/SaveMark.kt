@@ -9,6 +9,7 @@ import f95gm.server.config.constants.ServerConstants
 import f95gm.server.config.filters.gameTrackingStates
 import f95gm.server.http.request.*
 import f95gm.server.http.response.*
+import f95gm.server.model.EpochMillis
 import f95gm.server.model.marks.GameMark
 import f95gm.server.model.marks.MarkRequest
 import f95gm.server.persistence.ConditionalWriteResult
@@ -16,6 +17,7 @@ import f95gm.server.persistence.marks.marksJson
 import f95gm.server.routes.marks.live.invalidateLiveMark
 import f95gm.server.routes.marks.live.loadLiveMarks
 import f95gm.server.routes.session.requireBrowserSession
+import f95gm.server.state.runtime.IdempotencyRegistry
 import f95gm.server.state.runtime.routeDependencies
 import io.ktor.server.application.*
 
@@ -40,8 +42,8 @@ internal suspend fun saveMark(call: ApplicationCall) {
 
     val body = call.receiveLimitedText(ServerConstants.MAX_REQUEST_BODY_BYTES)
     val request = when (val decoded = decodeJson<MarkRequest>(body)) {
-        is f95gm.server.http.request.RequestValidation.Valid -> decoded.value
-        is f95gm.server.http.request.RequestValidation.Invalid -> {
+        is RequestValidation.Valid -> decoded.value
+        is RequestValidation.Invalid -> {
             respondFailure(
                 call,
                 ServerConstants.STATUS_BAD_REQUEST,
@@ -79,7 +81,7 @@ internal suspend fun saveMark(call: ApplicationCall) {
             existing?.storedVersion ?: StoredVersion(requestedStoredVersion)
         },
         lastSeenUpdateVersion = existing?.lastSeenUpdateVersion ?: StoredVersion(F95Defaults.EMPTY),
-        updatedAt = f95gm.server.model.EpochMillis(call.routeDependencies.clock.nowMillis())
+        updatedAt = EpochMillis(call.routeDependencies.clock.nowMillis())
     )
         val live = loadLiveMarks(call.routeDependencies, listOf(requestedMark), session)
     val effectiveStoredVersion = if (existing == null && !request.acknowledge) {
@@ -110,7 +112,7 @@ internal suspend fun saveMark(call: ApplicationCall) {
         invalidateLiveMark(call.routeDependencies, threadId)
         val responseBody = marksJson(listOf(mark), live)
         it.complete(
-            f95gm.server.state.runtime.IdempotencyRegistry.CachedResponse(
+            IdempotencyRegistry.CachedResponse(
                 ServerConstants.STATUS_OK.value,
                 responseBody,
                 null

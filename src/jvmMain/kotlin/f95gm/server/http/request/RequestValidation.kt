@@ -2,6 +2,7 @@ package f95gm.server.http.request
 
 import f95gm.domain.api.F95ApiErrorCode
 import f95gm.server.http.response.ServerMessageKey
+import f95gm.server.http.response.ServerMessageKeys
 import f95gm.server.state.runtime.upstreamJson
 
 internal sealed interface RequestValidation<out T> {
@@ -29,6 +30,6 @@ internal inline fun <reified T> decodeJson(body: String): RequestValidation<T> =
             RequestValidation.Invalid(
                 F95ApiErrorCode.INVALID_INPUT,
                 "Invalid JSON request",
-                messageKey = f95gm.server.http.response.ServerMessageKeys.INVALID_JSON_REQUEST
+                messageKey = ServerMessageKeys.INVALID_JSON_REQUEST
             )
         }

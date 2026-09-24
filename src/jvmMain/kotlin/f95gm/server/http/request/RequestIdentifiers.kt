@@ -1,6 +1,6 @@
 package f95gm.server.http.request
 
-import java.util.*
+import kotlin.uuid.Uuid
 
 @JvmInline
 internal value class ShutdownToken(val value: String) {
@@ -18,7 +18,7 @@ internal fun interface ShutdownTokenGenerator {
 }
 
 internal open class RequestIdentifierFactory(
-    private val uuid: () -> UUID = UUID::randomUUID
+    private val uuid: () -> Uuid = Uuid::random
 ) {
     val requestIds = RequestIdGenerator { RequestId(uuid().toString()) }
     val shutdownTokens = ShutdownTokenGenerator { ShutdownToken(uuid().toString()) }

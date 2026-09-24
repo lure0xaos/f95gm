@@ -3,6 +3,7 @@ package f95gm.server.upstream.request
 import f95gm.domain.values.F95AccountKey
 import f95gm.domain.values.F95SessionId
 import f95gm.server.model.auth.UpstreamSession
+import f95gm.server.model.http.UpstreamResponse
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -117,7 +118,7 @@ class UpstreamClientTest {
             delay(100)
             respond("late", HttpStatusCode.OK)
         })
-        var response: f95gm.server.model.http.UpstreamResponse? = null
+        var response: UpstreamResponse? = null
         runTest {
             response = withContext(Dispatchers.Default) {
                 UpstreamClient(
@@ -128,7 +129,7 @@ class UpstreamClientTest {
             }
         }
         assertEquals(HttpStatusCode.GatewayTimeout, response?.status)
-        assertEquals("TIMEOUT", (response as? f95gm.server.model.http.UpstreamResponse.Failure)?.reason?.name)
+        assertEquals("TIMEOUT", (response as? UpstreamResponse.Failure)?.reason?.name)
         client.close()
     }
 

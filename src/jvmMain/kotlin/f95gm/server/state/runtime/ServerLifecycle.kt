@@ -19,7 +19,7 @@ internal class ServerLifecycle : AutoCloseable {
         return resource
     }
 
-    fun isClosed(): Boolean = synchronized(lock) { closed }
+    val isClosed: Boolean get() = synchronized(lock) { closed }
 
     override fun close() {
         val toClose = synchronized(lock) {

@@ -2,7 +2,7 @@ package f95gm.server.config.session
 
 import f95gm.domain.values.F95SessionId
 import f95gm.server.config.constants.ServerConstants
-import java.util.*
+import kotlin.uuid.Uuid
 
 internal sealed interface SessionCookieParseResult {
     data class Valid(val id: F95SessionId) : SessionCookieParseResult
@@ -23,11 +23,9 @@ internal fun parseSessionCookieResult(header: String?): SessionCookieParseResult
         ?.let { it }
         ?: return SessionCookieParseResult.Missing
     if (value.length > ServerConstants.SESSION_ID_LENGTH) return SessionCookieParseResult.Invalid
-    return try {
-        SessionCookieParseResult.Valid(F95SessionId(UUID.fromString(value).toString()))
-    } catch (_: IllegalArgumentException) {
-        SessionCookieParseResult.Invalid
-    }
+    return Uuid.parseHexDashOrNull(value)
+        ?.let { SessionCookieParseResult.Valid(F95SessionId(it.toString())) }
+        ?: SessionCookieParseResult.Invalid
 }
 
 internal fun parseSessionCookie(header: String?): F95SessionId? =

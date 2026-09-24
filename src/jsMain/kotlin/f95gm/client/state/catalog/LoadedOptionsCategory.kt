@@ -4,7 +4,7 @@ import f95gm.client.state.runtime.clientController
 import f95gm.domain.filters.F95Category
 
 internal var loadedOptionsCategory: F95Category?
-    get() = clientController.loadedOptionsCategory()
+    get() = clientController.loadedOptionsCategory
     set(value) {
-        clientController.setLoadedOptionsCategory(value)
+        clientController.loadedOptionsCategory = value
     }

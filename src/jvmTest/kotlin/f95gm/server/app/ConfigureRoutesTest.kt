@@ -3,6 +3,7 @@ package f95gm.server.app
 import f95gm.domain.api.*
 import f95gm.domain.values.F95AccountKey
 import f95gm.domain.values.F95SessionId
+import f95gm.server.config.Bytes
 import f95gm.server.config.ServerConfig
 import f95gm.server.config.constants.ServerConstants
 import f95gm.server.desktop.ServerShutdownController
@@ -27,7 +28,7 @@ class ConfigureRoutesTest {
     @Test
     fun routeConfigurationKeepsTypedRequestAndBucketLimits() {
         val configuration = RouteConfiguration(
-            maxRequestBodyBytes = f95gm.server.config.Bytes(4096),
+            maxRequestBodyBytes = Bytes(4096),
             maxRateLimitBuckets = RateLimitBucketLimit(12)
         )
 
