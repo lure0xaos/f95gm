@@ -1,5 +1,7 @@
 package f95gm.server.http.response
 
+import f95gm.domain.api.ApiStatusCode
+
 import f95gm.domain.api.F95ApiError
 import f95gm.domain.api.F95ApiErrorCode
 import kotlinx.serialization.json.Json
@@ -19,9 +21,9 @@ class ApiFailureDetailsTest {
     fun jsonMessagesCarryMachineReadableErrorFields() {
         val encoded = jsonMessage(
             message = "Bad request",
-            messageKey = ServerMessageKeys.INVALID_JSON_REQUEST.apiKey,
+            messageKey = ServerMessageKey.INVALID_JSON_REQUEST.apiKey,
             code = F95ApiErrorCode.INVALID_INPUT,
-            details = mapOf("field" to "body")
+            details = ApiFailureDetails.field("body")
         )
         val decoded = Json.decodeFromString<F95ApiError>(encoded)
 
@@ -35,7 +37,16 @@ class ApiFailureDetailsTest {
     fun supportsTypedReasonAndStatusDetails() {
         assertEquals(
             mapOf("reason" to "timeout", "status" to "504"),
-            ApiFailureDetails(reason = "timeout", status = 504).asMap()
+            ApiFailureDetails(reason = "timeout", status = ApiStatusCode(504)).asMap()
         )
     }
+
+    @Test
+    fun preservesTypedConditionalWriteConflictMetadataAcrossWireMapping() {
+        val details = ApiFailureDetails.conflict(expected = 10L, actual = 11L)
+
+        assertEquals(10L, details.asContract().expectedUpdatedAt?.value)
+        assertEquals(11L, details.actualUpdatedAt?.value)
+    }
 }
+

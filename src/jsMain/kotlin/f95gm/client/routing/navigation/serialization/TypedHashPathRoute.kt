@@ -5,7 +5,7 @@ import f95gm.client.routing.navigation.TypedRoute
 import dev.fritz2.routing.Route as FritzRoute
 
 internal class TypedHashPathRoute(override val default: TypedRoute) : FritzRoute<TypedRoute> {
-    override fun deserialize(hash: String): TypedRoute = RouteAdapter.decode(RouteLocation.fromHash(hash))
+    override fun deserialize(hash: String): TypedRoute = RouteLocation.fromHashTyped(hash)
 
-    override fun serialize(route: TypedRoute): String = RouteLocation.toHash(RouteAdapter.encode(route))
+    override fun serialize(route: TypedRoute): String = RouteLocation.toHash(route)
 }

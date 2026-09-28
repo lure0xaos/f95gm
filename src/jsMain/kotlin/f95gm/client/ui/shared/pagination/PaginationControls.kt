@@ -50,7 +50,7 @@ internal fun <T> RenderContext.paginationControls(
 
                 (firstVisiblePage..lastVisiblePage).forEach { page ->
                     if (page == state.page) {
-                        if (state.editingPage) {
+                        if (state.editingPage == PageEditMode.EDITING) {
                             input("page-input $textFieldClass text-center fw-semibold") {
                                 type("number")
                                 attr("min", F95Defaults.FIRST_PAGE.toString())

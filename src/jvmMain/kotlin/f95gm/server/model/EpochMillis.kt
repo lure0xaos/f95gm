@@ -1,14 +1,6 @@
 package f95gm.server.model
 
-import kotlinx.serialization.Serializable
+import f95gm.domain.values.F95EpochMillis
 
-/** A wall-clock timestamp stored as Unix epoch milliseconds. */
-@JvmInline
-@Serializable
-internal value class EpochMillis(val value: Long) : Comparable<EpochMillis> {
-    init {
-        require(value >= 0) { "Epoch timestamp must not be negative" }
-    }
-
-    override fun compareTo(other: EpochMillis): Int = value.compareTo(other.value)
-}
+/** Server-side compatibility name for the shared persisted/wire epoch type. */
+internal typealias EpochMillis = F95EpochMillis

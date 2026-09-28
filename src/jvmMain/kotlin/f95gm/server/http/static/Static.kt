@@ -1,131 +1,98 @@
 package f95gm.server.http.static
 
 import f95gm.messages.UiMessages
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.config.security.ServerSecurityConfig
+import f95gm.server.config.constants.HttpStatusCatalog
+import f95gm.server.config.StaticDirectoryPath
 import f95gm.server.http.response.respond
-import f95gm.server.state.runtime.CloseGuard
-import f95gm.server.state.runtime.LifecycleResource
+import f95gm.server.kernel.CloseGuard
+import f95gm.server.kernel.LifecycleResource
+import f95gm.server.kernel.ResourceLock
+import f95gm.server.kernel.MetricCounter
+import f95gm.server.cache.CacheStatisticsProvider
 import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.response.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import java.nio.file.InvalidPathException
-import java.nio.file.Path
-import java.security.MessageDigest
-import kotlin.io.path.fileSize
-import kotlin.io.path.getLastModifiedTime
-import kotlin.io.path.readBytes
+import java.util.concurrent.atomic.AtomicReference
 
-internal class StaticResourceCache(overrideDirectory: String? = null) : LifecycleResource {
+internal enum class StaticAssetManifestInitializationStatus { UNINITIALIZED, LOADED, MISSING, INVALID }
+
+internal class StaticResourceCache(
+    overrideDirectory: StaticDirectoryPath? = null,
+    private val classLoader: ClassLoader = Thread.currentThread().contextClassLoader
+) : LifecycleResource, StaticResourceProvider, CacheStatisticsProvider {
     private val closeGuard = CloseGuard()
-    private val overrideResourceCache = OverrideResourceCache()
-    private val classpathResourceCache = ClasspathResourceCache()
-    private val overrideRoot = overrideDirectory?.let(::resolveOverrideRoot)
-    internal val generatedAssetManifest: Set<String> by lazy {
-        Thread.currentThread().contextClassLoader
-            .getResourceAsStream("static/asset-manifest.json")
-            ?.bufferedReader()
-            ?.use { reader -> runCatching { Json.parseToJsonElement(reader.readText()).jsonObject.keys }.getOrNull() }
-            .orEmpty()
+    private val resolver = StaticResourceResolver(overrideDirectory?.value)
+    private val assetManifestState = AtomicReference<StaticAssetManifestResult?>(null)
+    private val assetManifestLock = ResourceLock()
+    private val assetManifestFailures = MetricCounter()
+
+    internal val assetManifestInitializationStatus: StaticAssetManifestInitializationStatus
+        get() = assetManifestState.get().status()
+    internal val assetManifestFailureCount: Long get() = assetManifestFailures.get()
+
+    override fun snapshot(): f95gm.server.cache.CacheStatisticsSnapshot = resolver.snapshot()
+
+    override fun resolve(path: StaticResourcePath): StaticResourceLoadResult = resolver.resolve(path)
+
+    override fun assetManifestPaths(): Set<String> = assetManifestLock.withLock {
+        if (closeGuard.isClosed) return@withLock emptySet()
+        val manifest = assetManifestState.get() ?: StaticAssetManifestLoader
+            .load(classLoader)
+            .also { loaded ->
+                assetManifestState.set(loaded)
+                if (loaded is StaticAssetManifestResult.Invalid) assetManifestFailures.increment()
+            }
+        (manifest as? StaticAssetManifestResult.Loaded)?.paths.orEmpty()
     }
-
-    fun overrideResource(file: Path): StaticResource = overrideResourceCache.getOrLoad(file)
-
-    fun overrideResource(requested: String): StaticResource? =
-        overrideRoot?.let { root -> resolveOverrideFile(root, requested) }?.let(::overrideResource)
-
-    fun classpathResource(path: String): StaticResource? = classpathResourceCache.get(path)
 
     override val isClosed: Boolean get() = closeGuard.isClosed
 
     override fun close() = closeGuard.closeOnce {
-        overrideResourceCache.clear()
-        classpathResourceCache.clear()
+        resolver.clear()
     }
+}
+
+private fun StaticAssetManifestResult?.status(): StaticAssetManifestInitializationStatus = when (this) {
+    null -> StaticAssetManifestInitializationStatus.UNINITIALIZED
+    is StaticAssetManifestResult.Loaded -> StaticAssetManifestInitializationStatus.LOADED
+    StaticAssetManifestResult.Missing -> StaticAssetManifestInitializationStatus.MISSING
+    StaticAssetManifestResult.Invalid -> StaticAssetManifestInitializationStatus.INVALID
 }
 
 internal suspend fun static(
     call: ApplicationCall,
     requestedPath: String,
-    cache: StaticResourceCache,
+    cache: StaticResourceProvider,
 ) {
     val requested = safeStaticPath(requestedPath)
     if (requested == null) {
         respond(
             call,
-            ServerConstants.STATUS_NOT_FOUND,
+            HttpStatusCatalog.NOT_FOUND,
             UiMessages.server_resourceNotFound(),
-            ContentType.Text.Plain.toString()
+            ContentType.Text.Plain
         )
         return
     }
-    val resource = cache.overrideResource(requested)
-        ?: cache.classpathResource(requested)
+    val resource = when (val loaded = cache.resolve(requested)) {
+        is StaticResourceLoadResult.Found -> loaded.resource
+        StaticResourceLoadResult.Missing,
+        is StaticResourceLoadResult.Failed -> null
+    }
     if (resource == null) {
         respond(
             call,
-            ServerConstants.STATUS_NOT_FOUND,
+            HttpStatusCatalog.NOT_FOUND,
             UiMessages.server_resourceNotFound(),
-            ContentType.Text.Plain.toString()
+            ContentType.Text.Plain
         )
         return
     }
-    val contentType = staticContentType(requested.substringAfterLast('.', ""))
-    val hasRequestNonce =
-        requested == "index.html" && call.attributes.getOrNull(ServerSecurityConfig.CSP_NONCE_ATTRIBUTE) != null
-    if (!hasRequestNonce) call.response.headers.append(HttpHeaders.ETag, resource.etag)
-    val cacheControl = if (hasRequestNonce) "no-store" else staticCacheControl(requested, cache.generatedAssetManifest)
-    call.response.headers.append(HttpHeaders.CacheControl, cacheControl)
-    if (!hasRequestNonce && call.request.headers[HttpHeaders.IfNoneMatch] == resource.etag) {
-        call.respond(HttpStatusCode.NotModified)
-        return
-    }
-    val body = if (hasRequestNonce) {
-        String(resource.bytes, Charsets.UTF_8)
-            .replace("__F95GM_CSP_NONCE__", call.attributes[ServerSecurityConfig.CSP_NONCE_ATTRIBUTE])
-            .toByteArray(Charsets.UTF_8)
-    } else resource.bytes
-    call.respondBytes(body, contentType = contentType)
+    val manifest = cache.assetManifestPaths()
+    respondStaticResource(call, requested, resource, manifest)
 }
 
 internal data class StaticResource(val bytes: ByteArray, val etag: String)
-private data class CachedOverride(val size: Long, val modifiedAt: Long, val resource: StaticResource)
-
-private class OverrideResourceCache(private val maxEntries: Int = 256) {
-    private val values = LinkedHashMap<Path, CachedOverride>(maxEntries, 0.75f, true)
-    private val lock = Any()
-
-    fun getOrLoad(file: Path): StaticResource = synchronized(lock) {
-        val size = file.fileSize()
-        val modifiedAt = file.getLastModifiedTime().toMillis()
-        values[file]?.takeIf { it.size == size && it.modifiedAt == modifiedAt }?.let { return@synchronized it.resource }
-        val resource = file.readBytes().let { bytes -> StaticResource(bytes, etag(bytes)) }
-        values[file] = CachedOverride(size, modifiedAt, resource)
-        while (values.size > maxEntries) values.entries.iterator().apply { next(); remove() }
-        resource
-    }
-
-    fun clear() = synchronized(lock) { values.clear() }
-}
-
-internal fun etag(bytes: ByteArray): String =
-    "\"${MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }}\""
-
-internal fun safeStaticPath(requestedPath: String): String? {
-    val requested = requestedPath.ifBlank { "index.html" }
-    if (requested.any { it == '\u0000' }) return null
-    if (requested.contains("%2e", ignoreCase = true) || requested.contains("%2f", ignoreCase = true) ||
-        requested.contains("%5c", ignoreCase = true)
-    ) return null
-    val normalized = try {
-        Path.of(requested).normalize()
-    } catch (_: InvalidPathException) {
-        return null
-    } catch (_: SecurityException) {
-        return null
-    }
-    if (normalized.isAbsolute || normalized.startsWith("..")) return null
-    return normalized.toString().replace('\\', '/')
+internal sealed interface StaticResourceResult {
+    data class Found(val resource: StaticResource) : StaticResourceResult
+    data object Missing : StaticResourceResult
 }

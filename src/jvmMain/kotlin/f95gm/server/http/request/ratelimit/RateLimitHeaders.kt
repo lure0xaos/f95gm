@@ -1,60 +1,61 @@
 package f95gm.server.http.request.ratelimit
 
-import f95gm.server.config.constants.ServerConstants
+import f95gm.server.config.protocol.RateLimitProtocolConfig
 import io.ktor.server.application.*
+import f95gm.server.model.EpochMillis
 
 internal object RateLimitHeaders {
     private data class HeaderNames(val limit: String, val remaining: String, val reset: String)
 
     private val ipHeaders = HeaderNames(
-        ServerConstants.RATE_LIMIT_IP_LIMIT_HEADER,
-        ServerConstants.RATE_LIMIT_IP_REMAINING_HEADER,
-        ServerConstants.RATE_LIMIT_IP_RESET_HEADER
+        RateLimitProtocolConfig.IP_LIMIT,
+        RateLimitProtocolConfig.IP_REMAINING,
+        RateLimitProtocolConfig.IP_RESET
     )
     private val accountHeaders = HeaderNames(
-        ServerConstants.RATE_LIMIT_ACCOUNT_LIMIT_HEADER,
-        ServerConstants.RATE_LIMIT_ACCOUNT_REMAINING_HEADER,
-        ServerConstants.RATE_LIMIT_ACCOUNT_RESET_HEADER
+        RateLimitProtocolConfig.ACCOUNT_LIMIT,
+        RateLimitProtocolConfig.ACCOUNT_REMAINING,
+        RateLimitProtocolConfig.ACCOUNT_RESET
     )
 
     fun append(
         call: ApplicationCall,
         ip: RequestRateLimiter.Decision?,
         account: RequestRateLimiter.Decision?,
-        nowMillis: Long
+        now: EpochMillis
     ) {
-        appendScoped(call, ip, ipHeaders, nowMillis)
-        appendScoped(call, account, accountHeaders, nowMillis)
+        appendScoped(call, ip, ipHeaders, now)
+        appendScoped(call, account, accountHeaders, now)
         val decisions = listOfNotNull(ip, account)
         if (decisions.isEmpty()) return
-        call.response.headers.append(ServerConstants.RATE_LIMIT_HEADER, decisions.minOf { it.limit }.toString())
+        call.response.headers.append(RateLimitProtocolConfig.LIMIT, decisions.minOf { it.limit }.toString())
         call.response.headers.append(
-            ServerConstants.RATE_LIMIT_REMAINING_HEADER,
+            RateLimitProtocolConfig.REMAINING,
             decisions.minOf { it.remaining }.toString()
         )
         call.response.headers.append(
-            ServerConstants.RATE_LIMIT_RESET_HEADER,
-            resetSeconds(decisions.maxOf { it.resetAtMillis }, nowMillis)
+            RateLimitProtocolConfig.RESET,
+            resetSeconds(decisions.maxOf { it.resetAtMillis }, now.value)
         )
     }
 
-    fun retryAfterSeconds(decisions: Collection<RequestRateLimiter.Decision>, nowMillis: Long): String =
+    fun retryAfterSeconds(decisions: Collection<RequestRateLimiter.Decision>, now: EpochMillis): String =
         decisions.maxOf { it.resetAtMillis }
-            .minus(nowMillis).coerceAtLeast(0L)
-            .div(ServerConstants.MILLIS_PER_SECOND).coerceAtLeast(1).toString()
+            .minus(now.value).coerceAtLeast(0L)
+            .div(1000L).coerceAtLeast(1).toString()
 
     private fun appendScoped(
         call: ApplicationCall,
         decision: RequestRateLimiter.Decision?,
         headers: HeaderNames,
-        nowMillis: Long
+        now: EpochMillis
     ) {
         if (decision == null) return
         call.response.headers.append(headers.limit, decision.limit.toString())
         call.response.headers.append(headers.remaining, decision.remaining.toString())
-        call.response.headers.append(headers.reset, resetSeconds(decision.resetAtMillis, nowMillis))
+        call.response.headers.append(headers.reset, resetSeconds(decision.resetAtMillis, now.value))
     }
 
     private fun resetSeconds(resetAtMillis: Long, nowMillis: Long): String =
-        resetAtMillis.coerceAtLeast(nowMillis).div(ServerConstants.MILLIS_PER_SECOND).toString()
+        resetAtMillis.coerceAtLeast(nowMillis).div(1000L).toString()
 }

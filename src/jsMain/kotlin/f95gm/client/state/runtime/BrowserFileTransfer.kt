@@ -13,14 +13,7 @@ internal interface BrowserFileTransferPort {
     fun downloadTextFile(fileName: String, content: String)
 }
 
-internal object BrowserFileTransfer {
-    internal var port: BrowserFileTransferPort = DomBrowserFileTransfer
-
-    fun selectTextFile(onLoaded: (String) -> Unit) = port.selectTextFile(onLoaded)
-    fun downloadTextFile(fileName: String, content: String) = port.downloadTextFile(fileName, content)
-}
-
-private object DomBrowserFileTransfer : BrowserFileTransferPort {
+internal object DomBrowserFileTransfer : BrowserFileTransferPort {
     override fun selectTextFile(onLoaded: (String) -> Unit) {
         val input = document.createElement("input") as HTMLInputElement
         input.type = "file"

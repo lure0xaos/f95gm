@@ -1,15 +1,14 @@
 package f95gm.server.app
 
 import f95gm.server.config.Bytes
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.desktop.DesktopController
+import f95gm.server.config.RateLimitDefaults
 import f95gm.server.desktop.ServerShutdownController
 import f95gm.server.http.request.RequestIdGenerator
 import f95gm.server.http.request.SecureRequestIdentifiers
 import f95gm.server.http.request.ShutdownToken
 import f95gm.server.http.request.ratelimit.RateLimitPolicy
-import f95gm.server.state.runtime.ServerContext
-import f95gm.server.state.runtime.installServerContext
+import f95gm.server.state.runtime.ServerApplicationComposition
+import f95gm.server.state.runtime.installRouteDependencies
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 
@@ -17,46 +16,51 @@ import io.ktor.server.routing.*
 internal value class RateLimitBucketLimit(val value: Int)
 
 internal data class RouteConfiguration(
-    val staticDirectory: String? = null,
-    val maxRequestBodyBytes: Bytes = Bytes(ServerConstants.MAX_REQUEST_BODY_BYTES),
+    val maxRequestBodyBytes: Bytes = ServerOperationalDefaults.request.maxRequestBodyBytes,
     val rateLimitPolicy: RateLimitPolicy = RateLimitPolicy.fromApiRequestsPerMinute(
-        ServerConstants.API_REQUESTS_PER_MINUTE,
-        ServerConstants.RATE_LIMIT_WINDOW_MILLIS
+        RateLimitDefaults.API_REQUESTS_PER_MINUTE,
+        RateLimitDefaults.WINDOW_MILLIS
     ),
-    val maxRateLimitBuckets: RateLimitBucketLimit = RateLimitBucketLimit(ServerConstants.MAX_RATE_LIMIT_BUCKETS),
+    val maxRateLimitBuckets: RateLimitBucketLimit = ServerOperationalDefaults.request.maxRateLimitBuckets,
     val requestIdGenerator: RequestIdGenerator = SecureRequestIdentifiers.requestIds
 )
 
 internal fun Application.configureRoutes(
     shutdownToken: ShutdownToken,
     shutdownController: () -> ServerShutdownController,
-    desktop: () -> DesktopController?,
     routeConfiguration: RouteConfiguration,
-    context: ServerContext
-) = configureRoutesImplementation(shutdownToken, shutdownController, desktop, routeConfiguration, context)
+    composition: ServerApplicationComposition,
+    healthState: ServerHealthState
+) = configureRoutesImplementation(shutdownToken, shutdownController, routeConfiguration, composition, healthState)
 
 private fun Application.configureRoutesImplementation(
     shutdownToken: ShutdownToken,
     shutdownController: () -> ServerShutdownController,
-    desktop: () -> DesktopController?,
     routeConfiguration: RouteConfiguration,
-    context: ServerContext,
+    composition: ServerApplicationComposition,
+    healthState: ServerHealthState,
 ) {
-    installServerContext(context)
+    installRouteDependencies(composition.routes.dependencies)
     installRequestMonitoring(
         shutdownController,
-        context,
+        composition,
         RequestMonitoringConfiguration(
             maxRequestBodyBytes = routeConfiguration.maxRequestBodyBytes,
             rateLimitPolicy = routeConfiguration.rateLimitPolicy,
             maxRateLimitBuckets = routeConfiguration.maxRateLimitBuckets,
-            requestIdGenerator = routeConfiguration.requestIdGenerator
+            requestIdGenerator = routeConfiguration.requestIdGenerator,
+            configurationState = composition.runtime.configurationState
         )
     )
     routing {
-        configureHealthRoute(shutdownController, desktop, context)
+        configureHealthRoute(
+            shutdownController,
+            composition.infrastructure.requestMetrics,
+            composition.runtime.cacheStatisticsProvider,
+            healthState
+        )
         configureShutdownRoute(shutdownToken, shutdownController)
         configureApiRoutes()
-        configureStaticRoutes(shutdownToken, context.staticCache)
+        configureStaticRoutes(shutdownToken, composition.routes.services.staticCache)
     }
 }

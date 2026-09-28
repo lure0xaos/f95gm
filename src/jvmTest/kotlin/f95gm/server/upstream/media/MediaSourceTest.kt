@@ -1,28 +1,30 @@
 package f95gm.server.upstream.media
 
+import f95gm.server.config.upstream.UpstreamBaseUrl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class MediaSourceTest {
+    private val baseUrl = UpstreamBaseUrl.parse("https://f95zone.to")
     @Test
     fun normalizesSupportedAbsoluteAndProtocolRelativeSources() {
         assertEquals(
             "https://attachments.f95zone.to/files/game.jpg",
-            normalizedMediaSource(" https://attachments.f95zone.to/files/game.jpg ")
+            normalizedMediaUrl(" https://attachments.f95zone.to/files/game.jpg ", baseUrl)?.value
         )
         assertEquals(
             "https://preview.f95zone.to/files/game.jpg",
-            normalizedMediaSource("//preview.f95zone.to/files/game.jpg")
+            normalizedMediaUrl("//preview.f95zone.to/files/game.jpg", baseUrl)?.value
         )
-        assertNull(normalizedMediaSource("/files/game.jpg"))
+        assertNull(normalizedMediaUrl("/files/game.jpg", baseUrl))
     }
 
     @Test
     fun rejectsUnsupportedSchemesHostsAndMalformedSources() {
-        assertNull(normalizedMediaSource("http://attachments.f95zone.to/files/game.jpg"))
-        assertNull(normalizedMediaSource("https://example.com/files/game.jpg"))
-        assertNull(normalizedMediaSource("not a uri"))
+        assertNull(normalizedMediaUrl("http://attachments.f95zone.to/files/game.jpg", baseUrl))
+        assertNull(normalizedMediaUrl("https://example.com/files/game.jpg", baseUrl))
+        assertNull(normalizedMediaUrl("not a uri", baseUrl))
     }
 
     @Test

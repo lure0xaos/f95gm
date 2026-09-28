@@ -10,11 +10,13 @@ class HttpErrorTest {
     @Test
     fun specializedExceptionsExposeConsistentProtocolMetadata() {
         val badRequest =
-            ApiBadRequestException("bad", F95ApiMessageKey("server.invalidRequest"), mapOf("field" to "name"))
+            ApiBadRequestException(
+                "bad", F95ApiMessageKey("server.invalidRequest"), ApiFailureDetails.field("name")
+            )
         assertEquals(HttpStatusCode.BadRequest, badRequest.status)
         assertEquals(F95ApiErrorCode.INVALID_INPUT, badRequest.code)
         assertEquals("server.invalidRequest", badRequest.messageKey?.value)
-        assertEquals(mapOf("field" to "name"), badRequest.details)
+        assertEquals(mapOf("field" to "name"), badRequest.details.asMap())
 
         assertEquals(F95ApiErrorCode.CSRF_REJECTED, ApiCsrfException().code)
         assertEquals(HttpStatusCode.Forbidden, ApiCsrfException().status)

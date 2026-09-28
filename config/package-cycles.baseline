@@ -1,0 +1,4 @@
+# Remaining legacy cycles are outside the runtime composition package and are tracked separately.
+# The former application cycle was reduced by moving route capability ports; the
+# The former shared logging root has been moved to server.observability.
+# The remaining cycles are isolated to persistence/platform and HTTP route wiring.

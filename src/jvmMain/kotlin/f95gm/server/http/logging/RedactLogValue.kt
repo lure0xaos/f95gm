@@ -1,10 +1,6 @@
 package f95gm.server.http.logging
 
-private val sensitiveField = Regex(
-    "(?i)([\\\"']?(?:password|passwd|token|cookie|authorization|secret|accountKey|accountId|browserId|sessionId)[\\\"']?\\s*[=:]\\s*)(?:\\\"[^\\\"]*\\\"|'[^']*'|[^&\\s,}]+)"
-)
+import f95gm.server.observability.redactLogValue as redactStructuredLogValue
 
-internal fun redactLogValue(value: String): String =
-    sensitiveField.replace(value) { match -> "${match.groupValues[1]}<redacted>" }
-        .map { character -> if (character in '\u0000'..'\u001F' || character == '\u007F') ' ' else character }
-        .joinToString("")
+/** Compatibility facade for HTTP callers; the policy lives in observability. */
+internal fun redactLogValue(value: String): String = redactStructuredLogValue(value)

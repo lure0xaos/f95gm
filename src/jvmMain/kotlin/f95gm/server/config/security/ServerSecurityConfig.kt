@@ -5,6 +5,8 @@ import java.security.SecureRandom
 import java.util.*
 
 internal object ServerSecurityConfig {
+    data class Header(val name: String, val value: String)
+
     val CSP_NONCE_ATTRIBUTE = AttributeKey<String>("f95gm-csp-nonce")
     private val nonceRandom = SecureRandom()
     const val CONTENT_TYPE_OPTIONS = "nosniff"
@@ -19,4 +21,12 @@ internal object ServerSecurityConfig {
         "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'nonce-$nonce'; script-src 'self' 'nonce-$nonce'; frame-ancestors 'none'"
 
     const val COOKIE_ATTRIBUTES = "Path=/; HttpOnly; SameSite=Lax"
+
+    fun headers(nonce: String): List<Header> = listOf(
+        Header("X-Content-Type-Options", CONTENT_TYPE_OPTIONS),
+        Header("X-Frame-Options", FRAME_OPTIONS),
+        Header("Permissions-Policy", PERMISSIONS_POLICY),
+        Header("Referrer-Policy", REFERRER_POLICY),
+        Header("Content-Security-Policy", contentSecurityPolicy(nonce))
+    )
 }

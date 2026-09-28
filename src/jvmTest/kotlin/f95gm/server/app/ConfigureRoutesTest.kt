@@ -5,7 +5,6 @@ import f95gm.domain.values.F95AccountKey
 import f95gm.domain.values.F95SessionId
 import f95gm.server.config.Bytes
 import f95gm.server.config.ServerConfig
-import f95gm.server.config.constants.ServerConstants
 import f95gm.server.desktop.ServerShutdownController
 import f95gm.server.http.request.ShutdownToken
 import f95gm.server.http.request.ratelimit.RateLimitPolicy
@@ -22,7 +21,7 @@ import kotlinx.serialization.json.*
 import java.io.IOException
 import kotlin.test.*
 
-private val operationalEndpoints = setOf(F95Api.HEALTH, F95Api.LIVE, F95Api.READY, F95Api.METRICS, F95Api.SHUTDOWN)
+private val operationalEndpoints = setOf(F95ApiPaths.HEALTH, F95ApiPaths.LIVE, F95ApiPaths.READY, F95ApiPaths.METRICS, F95ApiPaths.SHUTDOWN)
 
 class ConfigureRoutesTest {
     @Test
@@ -38,9 +37,9 @@ class ConfigureRoutesTest {
 
     @Test
     fun configuredRoutesMatchTheSharedEndpointContract() {
-        val configured = configuredApiEndpoints.map { it.path to it.method.value }.toSet()
-        val declared = F95Api.endpointDescriptors.filterNot { it.path in operationalEndpoints }.flatMap { descriptor ->
-            descriptor.methods.map { method -> descriptor.path to method.wireValue }
+        val configured = configuredApiEndpoints.map { it.path to it.method.wireValue }.toSet()
+        val declared = endpointDescriptors.filterNot { it.path.value in operationalEndpoints }.flatMap { descriptor ->
+            descriptor.methods.map { method -> descriptor.path.value to method.wireValue }
         }.toSet()
         assertEquals(
             declared,
@@ -48,47 +47,67 @@ class ConfigureRoutesTest {
             "declared-only=${declared - configured}; configured-only=${configured - declared}"
         )
         assertEquals(
-            F95Api.endpointDescriptors.filterNot { it.path in operationalEndpoints }
-                .flatMap { descriptor -> descriptor.methods.map { descriptor.path to it.wireValue } }
+            endpointDescriptors.filterNot { it.path.value in operationalEndpoints }
+                .flatMap { descriptor -> descriptor.methods.map { descriptor.path.value to it.wireValue } }
                 .groupingBy { it }.eachCount(),
-            configuredApiEndpoints.map { it.path to it.method.value }.groupingBy { it }.eachCount(),
+            configuredApiEndpoints.map { it.path to it.method.wireValue }.groupingBy { it }.eachCount(),
             "Each declared method must have exactly one route handler"
         )
-        val generatedContract = F95Api.openApiContractJson()
+        assertEquals(
+            configuredApiEndpoints.size,
+            configuredApiEndpoints.map { it.path to it.method.wireValue }.distinct().size,
+            "Each route key must have exactly one handler"
+        )
+        configuredApiEndpoints.forEach { endpoint ->
+            assertTrue(endpoint.contractDescriptor.methods.any { it.wireValue == endpoint.method.wireValue })
+        }
+        val generatedContract = openApiContractJson()
         configuredApiEndpoints.forEach { endpoint ->
             assertContains(generatedContract, "\"${endpoint.path}\"")
-            assertContains(generatedContract, "\"${endpoint.method.value.lowercase()}\"")
+            assertContains(generatedContract, "\"${endpoint.method.wireValue.lowercase()}\"")
         }
     }
 
     @Test
+    fun endpointHandlerInventoryHasNoDuplicateContractKeys() {
+        val keys = configuredApiEndpoints.map { it.path to it.method.wireValue }
+        assertEquals(keys.size, keys.toSet().size, "A contract key must have one handler")
+        assertEquals(
+            endpointDescriptors.filterNot { it.path.value in operationalEndpoints }.flatMap { descriptor ->
+                descriptor.methods.map { descriptor.path.value to it.wireValue }
+            }.toSet(),
+            keys.toSet()
+        )
+    }
+
+    @Test
     fun openApiOperationsParametersAndSchemaReferencesMatchRegisteredRoutes() {
-        val contract = Json.parseToJsonElement(F95Api.openApiContractJson()).jsonObject
-        val paths = contract["paths"]!!.jsonObject
+        val contract = Json.parseToJsonElement(openApiContractJson()).jsonObject
+        val paths = contract.requiredObject("paths")
         val registeredRoutes = configuredApiEndpoints.filterNot { it.path in operationalEndpoints }
-            .map { it.path to it.method.value.lowercase() }.toSet()
+            .map { it.path to it.method.wireValue.lowercase() }.toSet()
         val documentedRoutes = paths.filterKeys { it !in operationalEndpoints }.flatMap { (path, operations) ->
             operations.jsonObject.keys.map { method -> path to method }
         }.toSet()
         assertEquals(registeredRoutes, documentedRoutes)
 
-        F95Api.endpointDescriptors.filterNot { it.path in operationalEndpoints }.forEach { descriptor ->
+        endpointDescriptors.filterNot { it.path.value in operationalEndpoints }.forEach { descriptor ->
             descriptor.methods.forEach { method ->
-                val operation = paths[descriptor.path]!!.jsonObject[method.wireValue.lowercase()]!!.jsonObject
+                    val operation = paths.requiredObject(descriptor.path.value).requiredObject(method.wireValue.lowercase())
                 val parameters = operation["parameters"]?.jsonArray.orEmpty().map { parameter ->
                     val value = parameter.jsonObject
-                    value["in"]!!.jsonPrimitive.content to value["name"]!!.jsonPrimitive.content
+                    value.requiredPrimitive("in").content to value.requiredPrimitive("name").content
                 }.toSet()
                 assertEquals(
-                    descriptor.pathParameters.map { "path" to it }
-                        .toSet() + descriptor.queryParameters.map { "query" to it }.toSet(),
+                    descriptor.pathParameters.map { "path" to it.value }
+                        .toSet() + descriptor.queryParameters.map { "query" to it.value }.toSet(),
                     parameters,
-                    "${method.wireValue} ${descriptor.path} parameter metadata"
+                    "${method.wireValue} ${descriptor.path.value} parameter metadata"
                 )
             }
         }
 
-        val schemas = contract["components"]!!.jsonObject["schemas"]!!.jsonObject
+        val schemas = contract.requiredObject("components").requiredObject("schemas")
         val unresolved = schemaReferences(contract).filter { reference ->
             reference.startsWith("#/components/schemas/") && reference.substringAfterLast('/') !in schemas
         }
@@ -109,12 +128,12 @@ class ConfigureRoutesTest {
     fun livenessRemainsAvailableWhileReadinessRejectsDrainingServer() = testApplication {
         val shutdownController = ServerShutdownController {}
         application {
-            configureTestRoutes("shutdown-token", { shutdownController }, { null })
+            configureTestRoutes("shutdown-token", { shutdownController }, { f95gm.server.desktop.NoopDesktopLifecycle })
         }
 
-        assertEquals(HttpStatusCode.OK, client.get(F95Api.LIVE).status)
+        assertEquals(HttpStatusCode.OK, client.get(F95ApiPaths.LIVE).status)
         shutdownController.request()
-        assertEquals(HttpStatusCode.ServiceUnavailable, client.get(F95Api.READY).status)
+        assertEquals(HttpStatusCode.ServiceUnavailable, client.get(F95ApiPaths.READY).status)
     }
 
     @Test
@@ -132,24 +151,23 @@ class ConfigureRoutesTest {
         val context = ServerContext(
             ServerConfig.from(emptyMap()),
             httpClient = upstream,
-            databaseExecutor = DatabaseExecutor(database = { error("database not used") })
+            databaseExecutor = DatabaseExecutor(database = { error("database not used") }, executionContext = f95gm.server.persistence.database.testDatabaseExecutionContext())
         )
         val sessionId = F95SessionId("00000000-0000-0000-0000-000000000001")
-        context.sessions.put(sessionId, UpstreamSession(sessionId, F95AccountKey("user")))
+        context.applicationComposition.infrastructure.sessions.put(sessionId, UpstreamSession(sessionId, F95AccountKey("user")))
         val shutdownController = ServerShutdownController {}
         application {
             configureRoutes(
                 ShutdownToken("shutdown-token"),
                 { shutdownController },
-                { null },
                 RouteConfiguration(),
                 context
             )
         }
 
         try {
-            val response = client.get("${F95Api.ITEM}/123") {
-                header(HttpHeaders.Cookie, "${ServerConstants.SESSION_COOKIE}=${sessionId.value}")
+            val response = client.get("${F95ApiPaths.ITEM}/123") {
+                header(HttpHeaders.Cookie, "${f95gm.server.config.protocol.SessionProtocolConfig.BROWSER_COOKIE}=${sessionId.value}")
             }
 
             assertEquals(HttpStatusCode.OK, response.status)
@@ -166,30 +184,29 @@ class ConfigureRoutesTest {
         val context = ServerContext(
             ServerConfig.from(emptyMap()),
             httpClient = upstream,
-            databaseExecutor = DatabaseExecutor(database = { error("database not used") })
+            databaseExecutor = DatabaseExecutor(database = { error("database not used") }, executionContext = f95gm.server.persistence.database.testDatabaseExecutionContext())
         )
         val sessionId = F95SessionId("00000000-0000-0000-0000-000000000003")
-        context.sessions.put(sessionId, UpstreamSession(sessionId, F95AccountKey("user")))
+        context.applicationComposition.infrastructure.sessions.put(sessionId, UpstreamSession(sessionId, F95AccountKey("user")))
         application {
             configureStatusPages()
             configureRoutes(
                 ShutdownToken("shutdown-token"),
                 { ServerShutdownController {} },
-                { null },
                 RouteConfiguration(),
                 context
             )
         }
 
         try {
-            val response = client.get("${F95Api.ITEM}/123") {
-                header(HttpHeaders.Cookie, "${ServerConstants.SESSION_COOKIE}=${sessionId.value}")
+            val response = client.get("${F95ApiPaths.ITEM}/123") {
+                header(HttpHeaders.Cookie, "${f95gm.server.config.protocol.SessionProtocolConfig.BROWSER_COOKIE}=${sessionId.value}")
             }
             val error = Json.decodeFromString<F95ApiError>(response.bodyAsText())
             assertEquals(HttpStatusCode.BadGateway, response.status)
             assertEquals(F95ApiErrorCode.UPSTREAM_FAILURE, error.code)
             assertEquals(F95ApiMessageKey("server.upstreamFailure"), error.messageKey)
-            assertEquals("TRANSPORT", error.details["reason"])
+            assertEquals("CONNECTION_FAILURE", error.details["reason"])
         } finally {
             context.close()
         }
@@ -201,31 +218,30 @@ class ConfigureRoutesTest {
         val context = ServerContext(
             ServerConfig.from(emptyMap()),
             httpClient = upstream,
-            databaseExecutor = DatabaseExecutor(database = { error("database not used") })
+            databaseExecutor = DatabaseExecutor(database = { error("database not used") }, executionContext = f95gm.server.persistence.database.testDatabaseExecutionContext())
         )
         val sessionId = F95SessionId("00000000-0000-0000-0000-000000000004")
-        context.sessions.put(sessionId, UpstreamSession(sessionId, F95AccountKey("user")))
+        context.applicationComposition.infrastructure.sessions.put(sessionId, UpstreamSession(sessionId, F95AccountKey("user")))
         application {
             configureStatusPages()
             configureRoutes(
                 ShutdownToken("shutdown-token"),
                 { ServerShutdownController {} },
-                { null },
                 RouteConfiguration(rateLimitPolicy = RateLimitPolicy.configured(4, 2, 60_000L)),
                 context
             )
         }
 
         try {
-            val response = client.get(F95Api.CATALOG) {
-                header(HttpHeaders.Cookie, "${ServerConstants.SESSION_COOKIE}=${sessionId.value}")
+            val response = client.get(F95ApiPaths.CATALOG) {
+                header(HttpHeaders.Cookie, "${f95gm.server.config.protocol.SessionProtocolConfig.BROWSER_COOKIE}=${sessionId.value}")
             }
             assertEquals(HttpStatusCode.OK, response.status)
-            assertEquals("4", response.headers[ServerConstants.RATE_LIMIT_IP_LIMIT_HEADER])
-            assertEquals("3", response.headers[ServerConstants.RATE_LIMIT_IP_REMAINING_HEADER])
-            assertEquals("2", response.headers[ServerConstants.RATE_LIMIT_ACCOUNT_LIMIT_HEADER])
-            assertEquals("1", response.headers[ServerConstants.RATE_LIMIT_ACCOUNT_REMAINING_HEADER])
-            assertNotNull(response.headers[ServerConstants.RATE_LIMIT_ACCOUNT_RESET_HEADER])
+            assertEquals("4", response.headers[f95gm.server.config.protocol.RateLimitProtocolConfig.IP_LIMIT])
+            assertEquals("3", response.headers[f95gm.server.config.protocol.RateLimitProtocolConfig.IP_REMAINING])
+            assertEquals("2", response.headers[f95gm.server.config.protocol.RateLimitProtocolConfig.ACCOUNT_LIMIT])
+            assertEquals("1", response.headers[f95gm.server.config.protocol.RateLimitProtocolConfig.ACCOUNT_REMAINING])
+            assertNotNull(response.headers[f95gm.server.config.protocol.RateLimitProtocolConfig.ACCOUNT_RESET])
         } finally {
             context.close()
         }
@@ -243,28 +259,27 @@ class ConfigureRoutesTest {
         val context = ServerContext(
             ServerConfig.from(emptyMap()),
             httpClient = upstream,
-            databaseExecutor = DatabaseExecutor(database = { error("database not used") })
+            databaseExecutor = DatabaseExecutor(database = { error("database not used") }, executionContext = f95gm.server.persistence.database.testDatabaseExecutionContext())
         )
         val sessionId = F95SessionId("00000000-0000-0000-0000-000000000005")
-        context.sessions.put(sessionId, UpstreamSession(sessionId, F95AccountKey("user")))
+        context.applicationComposition.infrastructure.sessions.put(sessionId, UpstreamSession(sessionId, F95AccountKey("user")))
         application {
             configureStatusPages()
             configureRoutes(
                 ShutdownToken("shutdown-token"),
                 { ServerShutdownController {} },
-                { null },
                 RouteConfiguration(),
                 context
             )
         }
 
         try {
-            val cookie = "${ServerConstants.SESSION_COOKIE}=${sessionId.value}"
-            val first = client.get(F95Api.CATALOG_OPTIONS) { header(HttpHeaders.Cookie, cookie) }
+            val cookie = "${f95gm.server.config.protocol.SessionProtocolConfig.BROWSER_COOKIE}=${sessionId.value}"
+            val first = client.get(F95ApiPaths.CATALOG_OPTIONS) { header(HttpHeaders.Cookie, cookie) }
             val etag = first.headers[HttpHeaders.ETag]
             assertEquals(HttpStatusCode.OK, first.status)
             assertNotNull(etag)
-            val second = client.get(F95Api.CATALOG_OPTIONS) {
+            val second = client.get(F95ApiPaths.CATALOG_OPTIONS) {
                 header(HttpHeaders.Cookie, cookie)
                 header(HttpHeaders.IfNoneMatch, "W/$etag")
             }

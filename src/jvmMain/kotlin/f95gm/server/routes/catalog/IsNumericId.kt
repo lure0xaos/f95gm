@@ -1,3 +1,5 @@
 package f95gm.server.routes.catalog
 
-internal fun isNumericId(value: String): Boolean = value.toIntOrNull()?.let { it > 0 } == true
+import f95gm.domain.api.parsePositiveInt
+
+internal fun isNumericId(value: String): Boolean = value.parsePositiveInt() != null

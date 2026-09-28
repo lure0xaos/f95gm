@@ -9,13 +9,16 @@
             "post": {
                 "operationId": "post_api_login",
                 "summary": "Create a browser session",
-                "description": "POST operation for session.",
+                "description": "Authenticates the user and establishes a browser session.",
                 "tags": [
                     "Session"
                 ],
                 "security": [],
                 "x-f95gm-mutation": "WRITE",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "JsonObject",
+                "x-f95gm-request-schema": "LoginRequest",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -114,7 +117,7 @@
             "post": {
                 "operationId": "post_api_logout",
                 "summary": "End the current browser session",
-                "description": "POST operation for session.",
+                "description": "Ends the current browser session and clears its upstream session state.",
                 "tags": [
                     "Session"
                 ],
@@ -125,6 +128,9 @@
                 ],
                 "x-f95gm-mutation": "WRITE",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "JsonObject",
+                "x-f95gm-request-schema": "EmptyRequest",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -270,6 +276,8 @@
                 "security": [],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "OkResponse",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -359,6 +367,8 @@
                 ],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "UpstreamCatalog",
                 "parameters": [
                     {
                         "name": "category",
@@ -575,7 +585,7 @@
             "get": {
                 "operationId": "get_api_catalog_options",
                 "summary": "Load catalog filter options",
-                "description": "GET operation for catalog.",
+                "description": "Returns the available catalog categories, tags, prefixes, and related filter options.",
                 "tags": [
                     "Catalog"
                 ],
@@ -586,6 +596,8 @@
                 ],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "CatalogOptions",
                 "parameters": [
                     {
                         "name": "category",
@@ -734,7 +746,7 @@
             "get": {
                 "operationId": "get_api_marks",
                 "summary": "List marked releases",
-                "description": "GET operation for marks.",
+                "description": "Returns the current user's marked releases.",
                 "tags": [
                     "Marks"
                 ],
@@ -745,6 +757,8 @@
                 ],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "Marks",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -883,7 +897,7 @@
             "get": {
                 "operationId": "get_api_marks_check",
                 "summary": "Check marked releases for updates",
-                "description": "GET operation for marks.",
+                "description": "Checks the current user's marked releases against the latest catalog state.",
                 "tags": [
                     "Marks"
                 ],
@@ -894,6 +908,8 @@
                 ],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "Marks",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -1032,7 +1048,7 @@
             "get": {
                 "operationId": "get_api_filters",
                 "summary": "List saved filters",
-                "description": "GET operation for saved filters.",
+                "description": "Returns the saved filters belonging to the current user.",
                 "tags": [
                     "Saved filters"
                 ],
@@ -1043,6 +1059,8 @@
                 ],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "SavedFilters",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -1179,7 +1197,7 @@
             "post": {
                 "operationId": "post_api_filters",
                 "summary": "Save a filter",
-                "description": "POST operation for saved filters.",
+                "description": "Validates and persists a saved filter for the current user.",
                 "tags": [
                     "Saved filters"
                 ],
@@ -1190,6 +1208,9 @@
                 ],
                 "x-f95gm-mutation": "WRITE",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "SavedFilters",
+                "x-f95gm-request-schema": "SavedFilterRequest",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -1338,7 +1359,7 @@
             "get": {
                 "operationId": "get_api_filters_export",
                 "summary": "Export saved filters",
-                "description": "GET operation for saved filters.",
+                "description": "Exports the current user's saved filters as a portable backup document.",
                 "tags": [
                     "Saved filters"
                 ],
@@ -1349,6 +1370,8 @@
                 ],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "QuickLinksBackup",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -1487,7 +1510,7 @@
             "post": {
                 "operationId": "post_api_filters_import",
                 "summary": "Import saved filters",
-                "description": "POST operation for saved filters.",
+                "description": "Imports and validates a saved-filter backup document.",
                 "tags": [
                     "Saved filters"
                 ],
@@ -1498,6 +1521,9 @@
                 ],
                 "x-f95gm-mutation": "WRITE",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "ImportedQuickLinks",
+                "x-f95gm-request-schema": "QuickLinksBackup",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -1646,7 +1672,7 @@
             "delete": {
                 "operationId": "delete_api_filters__filterId_",
                 "summary": "Delete a saved filter",
-                "description": "DELETE operation for saved filters.",
+                "description": "Deletes one saved filter belonging to the current user.",
                 "tags": [
                     "Saved filters"
                 ],
@@ -1657,6 +1683,8 @@
                 ],
                 "x-f95gm-mutation": "WRITE",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "OkResponse",
                 "parameters": [
                     {
                         "name": "filterId",
@@ -1805,7 +1833,7 @@
             "put": {
                 "operationId": "put_api_marks__threadId_",
                 "summary": "Save a release mark",
-                "description": "PUT operation for marks.",
+                "description": "Creates or updates a mark for one release.",
                 "tags": [
                     "Marks"
                 ],
@@ -1816,6 +1844,9 @@
                 ],
                 "x-f95gm-mutation": "WRITE",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "Marks",
+                "x-f95gm-request-schema": "MarkRequest",
                 "parameters": [
                     {
                         "name": "threadId",
@@ -1972,7 +2003,7 @@
             "delete": {
                 "operationId": "delete_api_marks__threadId_",
                 "summary": "Delete a release mark",
-                "description": "DELETE operation for marks.",
+                "description": "Deletes the mark for one release.",
                 "tags": [
                     "Marks"
                 ],
@@ -1983,6 +2014,8 @@
                 ],
                 "x-f95gm-mutation": "WRITE",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "OkResponse",
                 "parameters": [
                     {
                         "name": "threadId",
@@ -2131,7 +2164,7 @@
             "get": {
                 "operationId": "get_api_item__threadId_",
                 "summary": "Load release details",
-                "description": "GET operation for items.",
+                "description": "Returns parsed details for one release thread.",
                 "tags": [
                     "Items"
                 ],
@@ -2142,6 +2175,8 @@
                 ],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "ThreadDetail",
                 "parameters": [
                     {
                         "name": "threadId",
@@ -2301,6 +2336,8 @@
                 ],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "IP_AND_ACCOUNT",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "Media",
                 "parameters": [
                     {
                         "name": "url",
@@ -2450,13 +2487,41 @@
             "get": {
                 "operationId": "get_api_health",
                 "summary": "Check server health",
-                "description": "GET operation for server.",
+                "description": "Reports whether the server process is accepting health checks.",
                 "tags": [
                     "Server"
                 ],
                 "security": [],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "NONE",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "JsonObject",
+                "parameters": [
+                    {
+                        "name": "probe",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tabId",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "theme",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Successful response"
@@ -2468,13 +2533,15 @@
             "get": {
                 "operationId": "get_api_live",
                 "summary": "Check server liveness",
-                "description": "GET operation for server.",
+                "description": "Reports whether the server process is alive.",
                 "tags": [
                     "Server"
                 ],
                 "security": [],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "NONE",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "JsonObject",
                 "responses": {
                     "200": {
                         "description": "Successful response"
@@ -2493,6 +2560,8 @@
                 "security": [],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "NONE",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "JsonObject",
                 "responses": {
                     "200": {
                         "description": "Successful response"
@@ -2507,13 +2576,15 @@
             "get": {
                 "operationId": "get_api_metrics",
                 "summary": "Read server request metrics",
-                "description": "GET operation for server.",
+                "description": "Returns request, retry, cache, and circuit-breaker metrics.",
                 "tags": [
                     "Server"
                 ],
                 "security": [],
                 "x-f95gm-mutation": "READ",
                 "x-f95gm-rate-limit": "NONE",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "RequestMetrics",
                 "responses": {
                     "200": {
                         "description": "Successful response",
@@ -2539,6 +2610,8 @@
                 "security": [],
                 "x-f95gm-mutation": "WRITE",
                 "x-f95gm-rate-limit": "IP",
+                "x-f95gm-api-version": "1",
+                "x-f95gm-response-schema": "JsonObject",
                 "responses": {
                     "202": {
                         "description": "Successful response"
@@ -2972,6 +3045,24 @@
                         "additionalProperties": {
                             "type": "integer"
                         }
+                    },
+                    "upstream": {
+                        "type": "object"
+                    },
+                    "cacheShutdownRejections": {
+                        "type": "integer"
+                    },
+                    "cacheWaiterCancellations": {
+                        "type": "integer"
+                    },
+                    "cacheActiveLoadInvalidations": {
+                        "type": "integer"
+                    },
+                    "cacheStaleLoadCompletions": {
+                        "type": "integer"
+                    },
+                    "countersConsistent": {
+                        "type": "boolean"
                     }
                 }
             },

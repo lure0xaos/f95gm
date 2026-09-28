@@ -1,15 +1,18 @@
 package f95gm.server.persistence.filters
 
 import f95gm.domain.values.F95AccountKey
-import f95gm.server.config.constants.ServerConstants
 import f95gm.server.config.filters.excludedPrefixesKind
 import f95gm.server.config.filters.excludedTagsKind
 import f95gm.server.config.filters.selectedPrefixesKind
 import f95gm.server.config.filters.selectedTagsKind
 import f95gm.server.model.filters.SavedFilter
-import f95gm.server.persistence.ConditionalWriteResult
-import f95gm.server.persistence.database.DatabaseExecutor
-import f95gm.server.persistence.requireStorageLength
+import f95gm.server.model.EpochMillis
+import f95gm.server.model.ConditionalWriteResult
+import f95gm.server.persistence.database.TransactionBoundary
+import f95gm.server.observability.DatabaseOperation
+import f95gm.server.persistence.database.DatabaseEpochMillis
+import f95gm.server.persistence.model.requireStorageLength
+import f95gm.server.persistence.model.toRecord
 import f95gm.server.persistence.schema.SavedFilterOptionsTable
 import f95gm.server.persistence.schema.SavedFiltersTable
 import org.jetbrains.exposed.v1.core.eq
@@ -18,61 +21,73 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 
 internal suspend fun storeSavedFilterIfCurrent(
-    database: DatabaseExecutor,
+    database: TransactionBoundary,
     account: F95AccountKey,
     filter: SavedFilter,
-    expectedUpdatedAt: Long?
-): ConditionalWriteResult<SavedFilter> = database.transactionSuspending {
+    expectedUpdatedAt: EpochMillis?
+): ConditionalWriteResult<SavedFilter> = database.transactionSuspending(DatabaseOperation.FILTERS_STORE_IF_CURRENT) {
     val current = SavedFiltersTable.selectAll()
         .where { SavedFiltersTable.id eq filter.id.value }
         .singleOrNull()
         ?.get(SavedFiltersTable.updatedAt)
-    if (expectedUpdatedAt != null && current != expectedUpdatedAt) return@transactionSuspending ConditionalWriteResult.Conflict
+    if (expectedUpdatedAt != null && current != DatabaseEpochMillis.fromDomain(expectedUpdatedAt).value) {
+        return@transactionSuspending ConditionalWriteResult.Conflict(
+            expectedUpdatedAt, current?.let { DatabaseEpochMillis(it).toDomain() }
+        )
+    }
     ConditionalWriteResult.Stored(storeSavedFilterInTransaction(account, filter))
 }
 
 internal suspend fun storeSavedFilter(
-    database: DatabaseExecutor,
+    database: TransactionBoundary,
     account: F95AccountKey,
     filter: SavedFilter
-): SavedFilter = database.transactionSuspending {
+): SavedFilter = database.transactionSuspending(DatabaseOperation.FILTERS_STORE) {
     storeSavedFilterInTransaction(account, filter)
+}
+
+internal suspend fun storeSavedFilters(
+    database: TransactionBoundary,
+    account: F95AccountKey,
+    filters: List<SavedFilter>
+): List<SavedFilter> = database.transactionSuspending(DatabaseOperation.FILTERS_STORE_ALL) {
+    filters.map { storeSavedFilterInTransaction(account, it) }
 }
 
 private fun JdbcTransaction.storeSavedFilterInTransaction(account: F95AccountKey, filter: SavedFilter): SavedFilter {
     val storedFilter = filter.copy(id = uniqueFilterId(account, filter))
-    requireStorageLength(account.value, ServerConstants.ACCOUNT_KEY_LENGTH, "accountKey")
-    requireStorageLength(storedFilter.name.value, ServerConstants.FILTER_NAME_LENGTH, "filterName")
+    val record = storedFilter.toRecord()
+    SavedFilterStoragePolicy.validate(account, storedFilter)
     SavedFiltersTable.selectAll()
-        .where { SavedFiltersTable.accountKey eq account.value.take(ServerConstants.ACCOUNT_KEY_LENGTH) }
+        .where { SavedFiltersTable.accountKey eq SavedFilterStoragePolicy.accountKey(account) }
         .filter { it[SavedFiltersTable.name].equals(storedFilter.name.value, ignoreCase = true) }
         .forEach { row -> deleteSavedFilterRows(row[SavedFiltersTable.id]) }
     deleteSavedFilterRows(storedFilter.id.value)
     SavedFiltersTable.insert {
-        it[SavedFiltersTable.id] = storedFilter.id.value
-        it[SavedFiltersTable.accountKey] = account.value.take(ServerConstants.ACCOUNT_KEY_LENGTH)
-        it[SavedFiltersTable.name] = storedFilter.name.value.take(ServerConstants.FILTER_NAME_LENGTH)
-        it[SavedFiltersTable.category] = storedFilter.category
-        it[SavedFiltersTable.sort] = storedFilter.sort
-        it[SavedFiltersTable.search] = storedFilter.search.take(ServerConstants.MAX_TEXT_LENGTH)
-        it[SavedFiltersTable.creatorSearch] = storedFilter.creatorSearch.take(ServerConstants.MAX_TEXT_LENGTH)
-        it[SavedFiltersTable.searchMode] = storedFilter.searchMode
-        it[SavedFiltersTable.tagType] = storedFilter.tagType
-        it[SavedFiltersTable.dateLimit] = storedFilter.dateLimit
-        it[SavedFiltersTable.updatedAt] = storedFilter.updatedAt.value
+        it[SavedFiltersTable.id] = record.id
+        it[SavedFiltersTable.accountKey] = SavedFilterStoragePolicy.accountKey(account)
+        it[SavedFiltersTable.name] = SavedFilterStoragePolicy.name(record.name)
+        it[SavedFiltersTable.category] = record.category
+        it[SavedFiltersTable.sort] = record.sort
+        it[SavedFiltersTable.search] = SavedFilterStoragePolicy.search(record.search)
+        it[SavedFiltersTable.creatorSearch] = SavedFilterStoragePolicy.search(record.creatorSearch)
+        it[SavedFiltersTable.searchMode] = record.searchMode
+        it[SavedFiltersTable.tagType] = record.tagType
+        it[SavedFiltersTable.dateLimit] = record.dateLimit
+        it[SavedFiltersTable.updatedAt] = DatabaseEpochMillis.fromDomain(record.updatedAt).value
     }
     listOf(
-        selectedTagsKind to storedFilter.selectedTags,
-        excludedTagsKind to storedFilter.excludedTags,
-        selectedPrefixesKind to storedFilter.selectedPrefixes,
-        excludedPrefixesKind to storedFilter.excludedPrefixes
+        selectedTagsKind to record.selectedTags,
+        excludedTagsKind to record.excludedTags,
+        selectedPrefixesKind to record.selectedPrefixes,
+        excludedPrefixesKind to record.excludedPrefixes
     ).forEach { (kind, options) ->
         options.forEachIndexed { position, option ->
             SavedFilterOptionsTable.insert {
-                it[SavedFilterOptionsTable.filterId] = storedFilter.id.value
+                it[SavedFilterOptionsTable.filterId] = record.id
                 it[SavedFilterOptionsTable.kind] = kind
-                it[SavedFilterOptionsTable.optionId] = option.id.value
-                it[SavedFilterOptionsTable.name] = option.name.value
+                it[SavedFilterOptionsTable.optionId] = option.id
+                it[SavedFilterOptionsTable.name] = option.name
                 it[SavedFilterOptionsTable.position] = position
             }
         }

@@ -1,4 +1,4 @@
-package f95gm.server.persistence.filters.version
+package f95gm.server.model.version
 
 import kotlin.test.Test
 import kotlin.test.assertFalse

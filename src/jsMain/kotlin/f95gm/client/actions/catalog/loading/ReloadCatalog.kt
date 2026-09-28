@@ -1,5 +1,7 @@
 package f95gm.client.actions.catalog.loading
 
-internal fun reloadCatalog() {
-    launchCatalogLoad()
+import f95gm.client.state.runtime.ClientCatalogActionsPort
+
+internal fun reloadCatalog(runtime: ClientCatalogActionsPort) {
+    launchCatalogLoad(runtime)
 }

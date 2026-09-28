@@ -1,42 +1,47 @@
 package f95gm.server.routes.session
 
 import f95gm.messages.UiMessages
-import f95gm.server.config.constants.ServerConstants
 import f95gm.server.http.auth.isAuthenticatedUpstreamResponse
 import f95gm.server.http.response.ApiFailure
-import f95gm.server.http.response.ServerMessageKeys
+import f95gm.server.http.response.ServerMessageKey
 import f95gm.server.http.response.respondFailure
 import f95gm.server.http.response.respondJson
 import f95gm.server.model.http.OkResponse
-import f95gm.server.state.runtime.routeDependencies
-import f95gm.server.upstream.request.upstreamRequest
+import f95gm.server.routes.session.sessionDependencies
+import f95gm.server.upstream.request.UpstreamRequests
+import f95gm.server.upstream.request.UpstreamPaths
+import f95gm.server.upstream.request.UpstreamEndpointPolicy
 import io.ktor.http.*
 import io.ktor.server.application.*
 
 internal suspend fun sessionStatus(call: ApplicationCall) {
-    val current = browserSession(call, call.routeDependencies.sessions)
-    if (current == null) {
+    val current = browserSession(call, call.sessionDependencies.sessions)
+    if (current !is BrowserSession.Found) {
         clearBrowserCookie(call)
         respondFailure(
             call,
-            ServerConstants.STATUS_UNAUTHORIZED,
-            ApiFailure(UiMessages.server_noActiveSession(), ServerMessageKeys.SESSION_MISSING)
+            f95gm.server.config.constants.HttpStatusCatalog.UNAUTHORIZED,
+            ApiFailure(UiMessages.server_noActiveSession(), ServerMessageKey.SESSION_MISSING)
         )
         return
     }
 
-    val (id, session) = current
-    val verified = call.routeDependencies.upstreamRequest(HttpMethod.Get, "/sam/latest_alpha/", session)
-    if (isAuthenticatedUpstreamResponse(verified)) {
-        respondJson(call, ServerConstants.STATUS_OK, OkResponse(true))
+    val id = current.id
+    val session = current.session
+    val verified = call.sessionDependencies.upstream.request(
+        UpstreamRequests.get(UpstreamPaths.sessionStatus(call.sessionDependencies.upstreamEndpoints), session, policy = UpstreamEndpointPolicy.LOGIN)
+    )
+    if (isAuthenticatedUpstreamResponse(verified, call.sessionDependencies.upstreamEndpoints.origin)) {
+        respondJson(call, f95gm.server.config.constants.HttpStatusCatalog.OK, OkResponse(true))
     } else {
-        call.routeDependencies.sessionService.removeInMemory(id)
-        call.routeDependencies.sessionService.remove(id)
+        call.sessionDependencies.sessionService.removeInMemory(id)
+        call.sessionDependencies.sessionService.remove(id)
         clearBrowserCookie(call)
         respondFailure(
             call,
-            ServerConstants.STATUS_UNAUTHORIZED,
-            ApiFailure(UiMessages.server_sessionExpired(), ServerMessageKeys.SESSION_EXPIRED)
+            f95gm.server.config.constants.HttpStatusCatalog.UNAUTHORIZED,
+            ApiFailure(UiMessages.server_sessionExpired(), ServerMessageKey.SESSION_EXPIRED)
         )
     }
 }
+

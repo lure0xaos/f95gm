@@ -1,9 +1,10 @@
 package f95gm.client.state.settings
 
 import f95gm.client.model.settings.*
-import f95gm.client.state.runtime.BrowserRuntime
-import f95gm.client.state.runtime.BrowserRuntimePort
+import f95gm.client.state.runtime.BrowserEffects
+import f95gm.client.state.runtime.WindowBrowserEffects
 import f95gm.client.state.runtime.BrowserStorage
+import f95gm.client.state.runtime.BrowserStorageRuntime
 import f95gm.client.state.runtime.BrowserStoragePort
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,70 +12,56 @@ import kotlin.test.assertEquals
 class AppSettingsTest {
     @Test
     fun persistsAndLoadsAllApplicationSettings() {
-        val previous = BrowserStorage.localPort
-        try {
-            val values = mutableMapOf<String, String>()
-            BrowserStorage.localPort = object : BrowserStoragePort {
+        val values = mutableMapOf<String, String>()
+        val storage = BrowserStorage(object : BrowserStorageRuntime {
+            override val localStorage = object : BrowserStoragePort {
                 override fun read(key: String): String? = values[key]
                 override fun write(key: String, value: String) {
                     values[key] = value
                 }
             }
-            val expected = AppSettingsState(
-                theme = AppTheme.LIGHT,
-                lazyLoadImages = false,
-                updateCheckInterval = UpdateCheckInterval.DAY,
-                pageSize = PageSize.HUGE,
-                cardSize = CardSize.VERY_LARGE
-            )
+            override val sessionStorage = localStorage
+        })
+        val expected = AppSettingsState(
+            theme = AppTheme.LIGHT,
+            lazyLoadImages = false,
+            updateCheckInterval = UpdateCheckInterval.DAY,
+            pageSize = PageSize.HUGE,
+            cardSize = CardSize.VERY_LARGE
+        )
 
-            persistAppSettings(expected)
+        persistAppSettings(expected, storage)
 
-            assertEquals(expected, loadAppSettings())
-        } finally {
-            BrowserStorage.localPort = previous
-        }
+        assertEquals(expected, loadAppSettings(storage))
     }
 
     @Test
     fun invalidStoredValuesUseApplicationDefaults() {
-        val previous = BrowserStorage.localPort
-        try {
-            BrowserStorage.localPort = object : BrowserStoragePort {
+        val storage = BrowserStorage(object : BrowserStorageRuntime {
+            override val localStorage = object : BrowserStoragePort {
                 override fun read(key: String): String? = when (key) {
-                    SettingsStorageKeys.LAZY_LOAD_IMAGES -> null
+                    SettingsStorageKeys.LAZY_LOAD_IMAGES.value -> null
                     else -> "invalid"
                 }
 
                 override fun write(key: String, value: String) = Unit
             }
+            override val sessionStorage = localStorage
+        })
 
-            assertEquals(AppSettingsState(), loadAppSettings())
-        } finally {
-            BrowserStorage.localPort = previous
-        }
+        assertEquals(AppSettingsState(), loadAppSettings(storage))
     }
 
     @Test
     fun systemThemeUsesTheBrowserPreferenceForDesktopRendering() {
-        val previous = BrowserRuntime.port
-        try {
-            BrowserRuntime.port = object : BrowserRuntimePort {
-                override val pathname = "/"
-                override val search = ""
-                override fun prefersDarkTheme() = true
-            }
-            assertEquals("dark", AppTheme.SYSTEM.desktopValue())
-
-            BrowserRuntime.port = object : BrowserRuntimePort {
-                override val pathname = "/"
-                override val search = ""
-                override fun prefersDarkTheme() = false
-            }
-            assertEquals("light", AppTheme.SYSTEM.desktopValue())
-        } finally {
-            BrowserRuntime.port = previous
+        val darkBrowser = object : BrowserEffects by WindowBrowserEffects {
+            override fun prefersDarkTheme() = true
         }
+        val lightBrowser = object : BrowserEffects by WindowBrowserEffects {
+            override fun prefersDarkTheme() = false
+        }
+        assertEquals("dark", AppTheme.SYSTEM.desktopValue(darkBrowser))
+        assertEquals("light", AppTheme.SYSTEM.desktopValue(lightBrowser))
     }
 
     @Test

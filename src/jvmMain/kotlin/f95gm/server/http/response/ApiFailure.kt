@@ -1,6 +1,7 @@
 package f95gm.server.http.response
 
 import f95gm.domain.api.F95ApiErrorCode
+import f95gm.server.config.constants.HttpStatusCatalog
 import io.ktor.http.*
 import io.ktor.server.application.*
 
@@ -19,9 +20,21 @@ internal data class ApiFailure(
     }
 }
 
-internal suspend fun respondFailure(call: ApplicationCall, status: HttpStatusCode, failure: ApiFailure) {
-    respond(call, status, jsonMessage(failure.message, failure.key.apiKey, failure.code, failure.details.asMap()))
+internal data class ApiFailureResponse(val status: HttpStatusCode, val failure: ApiFailure)
+
+internal fun interface ApiResponsePolicy<in T> {
+    fun failure(value: T): ApiFailureResponse
 }
+
+internal fun badRequestResponse(failure: ApiFailure): ApiFailureResponse =
+    ApiFailureResponse(HttpStatusCatalog.BAD_REQUEST, failure)
+
+internal suspend fun respondFailure(call: ApplicationCall, status: HttpStatusCode, failure: ApiFailure) {
+    respond(call, status, jsonMessage(failure))
+}
+
+internal suspend fun respondFailure(call: ApplicationCall, response: ApiFailureResponse) =
+    respondFailure(call, response.status, response.failure)
 
 internal suspend fun respondApiFailure(
     call: ApplicationCall,

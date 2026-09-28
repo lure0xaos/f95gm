@@ -1,5 +1,6 @@
 package f95gm.server.persistence.database
 
+import f95gm.server.persistence.testDatabaseUrl
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
@@ -17,10 +18,10 @@ class DatabaseExecutorTest {
     @Test
     fun failedTransactionRollsBackWrites() {
         val database = Database.connect(
-            url = "jdbc:h2:mem:transaction_${System.nanoTime()};DB_CLOSE_DELAY=-1",
+            url = testDatabaseUrl("transaction"),
             driver = "org.h2.Driver"
         )
-        val executor = DatabaseExecutor(database = { database })
+        val executor = DatabaseExecutor(database = { database }, executionContext = testDatabaseExecutionContext())
         transaction(database) { SchemaUtils.create(TransactionProbe) }
 
         runCatching {

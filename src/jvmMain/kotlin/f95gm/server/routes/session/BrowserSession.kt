@@ -2,45 +2,57 @@ package f95gm.server.routes.session
 
 import f95gm.domain.values.F95SessionId
 import f95gm.messages.UiMessages
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.config.session.parseSessionCookie
+import f95gm.server.config.session.parseSessionCookieResult
 import f95gm.server.http.response.ApiFailure
 import f95gm.server.http.response.ServerMessageKey
-import f95gm.server.http.response.ServerMessageKeys
 import f95gm.server.http.response.respondFailure
 import f95gm.server.model.auth.UpstreamSession
-import f95gm.server.state.runtime.routeDependencies
-import f95gm.server.state.runtime.session.SessionRegistry
+import f95gm.server.routes.session.sessionDependencies
+import f95gm.server.application.SessionRegistry
+import f95gm.server.session.SessionLookup
 import io.ktor.http.*
 import io.ktor.server.application.*
 
-internal fun browserSession(call: ApplicationCall, registry: SessionRegistry): Pair<F95SessionId, UpstreamSession>? {
-    val id = parseSessionCookie(call.request.headers[HttpHeaders.Cookie])
-    return id?.let { registry.get(it)?.let { stored -> it to stored } }
+internal sealed interface BrowserSession {
+    data object MissingCookie : BrowserSession
+    data object MissingRegistrySession : BrowserSession
+    data class Found(val id: F95SessionId, val session: UpstreamSession) : BrowserSession
+}
+
+internal fun browserSession(call: ApplicationCall, registry: SessionRegistry): BrowserSession {
+    return when (val cookie = parseSessionCookieResult(call.request.headers[HttpHeaders.Cookie])) {
+        f95gm.server.config.session.SessionCookieParseResult.Missing,
+        f95gm.server.config.session.SessionCookieParseResult.Invalid -> BrowserSession.MissingCookie
+        is f95gm.server.config.session.SessionCookieParseResult.Valid -> when (val lookup = registry.lookup(cookie.id)) {
+            is SessionLookup.Found -> BrowserSession.Found(cookie.id, lookup.session)
+            SessionLookup.Missing -> BrowserSession.MissingRegistrySession
+        }
+    }
 }
 
 internal suspend fun ApplicationCall.respondAuthenticationRequired() {
     respondFailure(
         this,
-        ServerConstants.STATUS_UNAUTHORIZED,
+        f95gm.server.config.constants.HttpStatusCatalog.UNAUTHORIZED,
         ApiFailure.authenticationRequired(
             UiMessages.server_authenticationRequired(),
-            ServerMessageKeys.AUTHENTICATION_REQUIRED
+            ServerMessageKey.AUTHENTICATION_REQUIRED
         )
     )
 }
 
 internal suspend fun ApplicationCall.requireBrowserSession(
     message: String,
-    messageKey: ServerMessageKey = ServerMessageKeys.AUTHENTICATION_REQUIRED
+    messageKey: ServerMessageKey = ServerMessageKey.AUTHENTICATION_REQUIRED
 ): UpstreamSession? =
     authenticatedSessionOrNull()?.takeIf(UpstreamSession::hasAuthorizedAccount)
         ?.also { session ->
             if (authorizationContextOrNull() == null) attachAuthenticatedSession(session)
         }
-        ?: browserSession(this, this.routeDependencies.sessions)?.second
+        ?: (browserSession(this, this.sessionDependencies.sessions) as? BrowserSession.Found)?.session
             ?.takeIf(UpstreamSession::hasAuthorizedAccount)
             ?.also(::attachAuthenticatedSession) ?: run {
-            respondFailure(this, ServerConstants.STATUS_UNAUTHORIZED, ApiFailure(message, messageKey))
+            respondFailure(this, f95gm.server.config.constants.HttpStatusCatalog.UNAUTHORIZED, ApiFailure(message, messageKey))
             null
 }
+

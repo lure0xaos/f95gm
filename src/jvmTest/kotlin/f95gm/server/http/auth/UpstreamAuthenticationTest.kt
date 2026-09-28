@@ -18,7 +18,7 @@ class UpstreamAuthenticationTest {
                     HttpStatusCode.OK,
                     "<html><body>Welcome</body></html>",
                     null
-                )
+                ), "https://f95zone.to"
             )
         )
         assertTrue(
@@ -27,7 +27,7 @@ class UpstreamAuthenticationTest {
                     HttpStatusCode.PartialContent,
                     "content",
                     null
-                )
+                ), "https://f95zone.to"
             )
         )
     }
@@ -40,7 +40,7 @@ class UpstreamAuthenticationTest {
                     HttpStatusCode.Unauthorized,
                     "Welcome",
                     null
-                )
+                ), "https://f95zone.to"
             )
         )
         assertFalse(
@@ -49,7 +49,7 @@ class UpstreamAuthenticationTest {
                     HttpStatusCode.OK,
                     "<html data-template=\"login\"><title>Log in</title></html>",
                     null
-                )
+                ), "https://f95zone.to"
             )
         )
         assertFalse(
@@ -58,10 +58,10 @@ class UpstreamAuthenticationTest {
                     HttpStatusCode.OK,
                     "<p>You have to be logged in to access this page</p>",
                     null
-                )
+                ), "https://f95zone.to"
             )
         )
-        assertTrue(isUnauthenticatedUpstreamBody("<title>Log in to F95zone</title>"))
+        assertTrue(isUnauthenticatedUpstreamBody("<title>Log in to F95zone</title>", "https://f95zone.to"))
     }
 
     @Test

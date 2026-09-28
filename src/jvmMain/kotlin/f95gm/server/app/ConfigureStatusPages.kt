@@ -3,7 +3,7 @@ package f95gm.server.app
 import f95gm.domain.api.F95ApiError
 import f95gm.domain.api.F95ApiErrorCode
 import f95gm.domain.api.F95ApiMessageKey
-import f95gm.server.config.logging.logger
+import f95gm.server.observability.logger
 import f95gm.server.http.request.requestContext
 import f95gm.server.http.response.respondJson
 import io.ktor.http.*
@@ -21,9 +21,7 @@ internal fun Application.configureStatusPages() {
             } else {
                 logger.error(error) {
                     "event=unhandled_request_exception requestId=${
-                        runCatching { call.requestContext.requestId.value }.getOrDefault(
-                            "unknown"
-                        )
+                        try { call.requestContext.requestId.value } catch (_: IllegalStateException) { "unknown" }
                     }"
                 }
                 call.respondApiError(

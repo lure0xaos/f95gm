@@ -1,16 +1,18 @@
 package f95gm.server.http.response
 
-import f95gm.server.state.runtime.IdempotencyRegistry
-import f95gm.server.state.runtime.upstreamJson
+import f95gm.server.application.port.CachedResponse
+import f95gm.server.http.serialization.upstreamJson
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
-internal suspend fun respond(call: ApplicationCall, status: HttpStatusCode, body: String, contentType: String? = null) {
-    call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+internal suspend fun respond(call: ApplicationCall, status: HttpStatusCode, body: String, contentType: ContentType? = null) {
+    call.appendNoStore()
     call.respondText(
         text = body,
-        contentType = contentType?.let { ContentType.parse(it) } ?: ContentType.Application.Json,
+        contentType = contentType ?: ContentType.Application.Json,
         status = status
     )
 }
@@ -26,12 +28,12 @@ internal suspend inline fun <reified T> respondJsonCacheable(
     call: ApplicationCall,
     status: HttpStatusCode,
     value: T,
-    maxAgeSeconds: Long = 60
+    maxAge: Duration = 60.seconds
 ) {
     val body = encodeJson(value)
     val etag = EntityTagPolicy.forBody(body)
     call.response.headers.append(HttpHeaders.ETag, etag)
-    call.response.headers.append(HttpHeaders.CacheControl, "private, max-age=${maxAgeSeconds.coerceAtLeast(0)}")
+    call.appendPrivateCache(maxAge)
     if (EntityTagPolicy.matches(call, etag)) {
         call.respond(HttpStatusCode.NotModified)
     } else {
@@ -39,6 +41,11 @@ internal suspend inline fun <reified T> respondJsonCacheable(
     }
 }
 
-internal suspend fun respondCached(call: ApplicationCall, cached: IdempotencyRegistry.CachedResponse) {
-    respond(call, HttpStatusCode.fromValue(cached.status), cached.body, cached.contentType)
+internal suspend fun respondCached(call: ApplicationCall, cached: CachedResponse) {
+    respond(
+        call,
+        HttpStatusCode.fromValue(cached.status.value),
+        cached.body,
+        cached.contentType?.let(ContentType::parse)
+    )
 }

@@ -11,6 +11,6 @@ class ServerContextLifecycleTest {
         context.close()
         context.close()
 
-        assertFailsWith<IllegalStateException> { context.upstream }
+        assertFailsWith<IllegalStateException> { context.applicationComposition.routes.dependencies.item.upstream }
     }
 }

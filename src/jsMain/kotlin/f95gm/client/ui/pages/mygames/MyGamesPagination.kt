@@ -1,27 +1,28 @@
 package f95gm.client.ui.pages.mygames
 
 import dev.fritz2.core.RenderContext
-import f95gm.client.actions.marks.pagination.*
 import f95gm.client.model.marks.markedGamesView
-import f95gm.client.state.marks.marks
 import f95gm.client.ui.shared.pagination.PaginationState
 import f95gm.client.ui.shared.pagination.paginationControls
+import f95gm.client.state.runtime.ClientMarksUiPort
+import f95gm.client.model.marks.loading
 
-internal fun RenderContext.myGamesPagination() {
+internal fun RenderContext.myGamesPagination(runtime: ClientMarksUiPort) {
+    val marks = runtime.marksView
     paginationControls(
         source = marks.data,
         stateFor = { state ->
             val view = markedGamesView(state)
-            PaginationState(view.page, view.totalPages, state.loading, state.editingPage, state.pageInput)
+            PaginationState(view.page, view.totalPages, state.loading, state.editingPage, state.pageInput.value)
         },
-        onFirstPage = { moveMarkedPageTo(1) },
-        onPreviousPage = { moveMarkedPage(-1) },
-        onPage = { moveMarkedPageTo(it) },
-        onNextPage = { moveMarkedPage(1) },
-        onLastPage = { moveMarkedPageTo(Int.MAX_VALUE) },
-        onStartPageEdit = { startMarkedPageEdit() },
-        onPageInput = { updateMarkedPageInput(it) },
-        onSubmitPageInput = { submitMarkedPageInput() },
-        onClosePageEdit = { closeMarkedPageEdit() }
+        onFirstPage = { runtime.marksCommands.moveMarkedPageTo(1) },
+        onPreviousPage = { runtime.marksCommands.moveMarkedPage(-1) },
+        onPage = { runtime.marksCommands.moveMarkedPageTo(it) },
+        onNextPage = { runtime.marksCommands.moveMarkedPage(1) },
+        onLastPage = { runtime.marksCommands.moveMarkedPageTo(Int.MAX_VALUE) },
+        onStartPageEdit = { runtime.marksCommands.startMarkedPageEdit() },
+        onPageInput = { runtime.marksCommands.updateMarkedPageInput(it) },
+        onSubmitPageInput = { runtime.marksCommands.submitMarkedPageInput() },
+        onClosePageEdit = { runtime.marksCommands.closeMarkedPageEdit() }
     )
 }

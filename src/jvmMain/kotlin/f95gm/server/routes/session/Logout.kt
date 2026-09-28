@@ -1,32 +1,32 @@
 package f95gm.server.routes.session
 
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.config.logging.*
-import f95gm.server.http.request.currentRequestContext
+import f95gm.server.observability.*
+import f95gm.server.http.request.currentRequestIdValue
 import f95gm.server.http.response.respondJson
 import f95gm.server.model.http.OkResponse
-import f95gm.server.state.runtime.routeDependencies
+import f95gm.server.routes.session.sessionDependencies
 import io.ktor.server.application.*
 
 internal suspend fun logout(call: ApplicationCall) {
-    browserSession(call, call.routeDependencies.sessions)?.let {
-        call.routeDependencies.sessionService.removeInMemory(it.first)
-        call.routeDependencies.sessionService.remove(it.first)
+    val current = browserSession(call, call.sessionDependencies.sessions)
+    if (current is BrowserSession.Found) {
+        call.sessionDependencies.sessionService.removeInMemory(current.id)
+        call.sessionDependencies.sessionService.remove(current.id)
     }
     clearBrowserCookie(call)
     logger.info {
         auditLog(
             AuditEvent(
                 AuditEventName.LOGOUT, listOf(
-                    logField("requestId", currentRequestContext()?.requestId?.value),
+                    logField(StructuredLogKeys.REQUEST_ID, currentRequestIdValue()),
                     logField(
-                        "account",
-                        browserSession(call, call.routeDependencies.sessions)?.second?.accountKey?.value
+                        StructuredLogKeys.ACCOUNT,
+                        (current as? BrowserSession.Found)?.session?.accountKey?.value
                     ),
-                    logField("outcome", "success")
+                    logField(StructuredLogKeys.OUTCOME, AuditOutcome.SUCCESS.wireName)
                 )
             )
         )
     }
-    respondJson(call, ServerConstants.STATUS_OK, OkResponse(true))
+    respondJson(call, f95gm.server.config.constants.HttpStatusCatalog.OK, OkResponse(true))
 }

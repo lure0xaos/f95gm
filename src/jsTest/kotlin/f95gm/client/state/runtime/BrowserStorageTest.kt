@@ -2,85 +2,84 @@ package f95gm.client.state.runtime
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class BrowserStorageTest {
     @Test
     fun fileTransferPortCanBeExercisedWithoutDom() {
-        val previous = BrowserFileTransfer.port
-        try {
-            var selected: String? = null
-            var downloaded: Pair<String, String>? = null
-            BrowserFileTransfer.port = object : BrowserFileTransferPort {
-                override fun selectTextFile(onLoaded: (String) -> Unit) {
-                    onLoaded("{}")
-                }
-
-                override fun downloadTextFile(fileName: String, content: String) {
-                    downloaded = fileName to content
-                }
+        var selected: String? = null
+        var downloaded: Pair<String, String>? = null
+        val effects = object : BrowserEffects by WindowBrowserEffects {
+            override fun selectTextFile(onLoaded: (String) -> Unit) {
+                onLoaded("{}")
             }
 
-            BrowserFileTransfer.selectTextFile { selected = it }
-            BrowserFileTransfer.downloadTextFile("filters.json", "{}")
-
-            assertEquals("{}", selected)
-            assertEquals("filters.json" to "{}", downloaded)
-        } finally {
-            BrowserFileTransfer.port = previous
+            override fun downloadTextFile(fileName: String, content: String) {
+                downloaded = fileName to content
+            }
         }
+
+        effects.selectTextFile { selected = it }
+        effects.downloadTextFile("filters.json", "{}")
+
+        assertEquals("{}", selected)
+        assertEquals("filters.json" to "{}", downloaded)
     }
 
     @Test
     fun browserRuntimePortProvidesNavigationAndThemeInputs() {
-        val previous = BrowserRuntime.port
-        try {
-            BrowserRuntime.port = object : BrowserRuntimePort {
-                override val pathname = "/settings"
-                override val search = "?theme=dark"
-                override fun prefersDarkTheme() = true
-            }
-
-            assertEquals("/settings", BrowserRuntime.pathname)
-            assertEquals("?theme=dark", BrowserRuntime.search)
-            assertEquals(true, BrowserRuntime.prefersDarkTheme())
-        } finally {
-            BrowserRuntime.port = previous
+        val effects = object : BrowserEffects by WindowBrowserEffects {
+            override val pathname = "/settings"
+            override val search = "?theme=dark"
+            override fun prefersDarkTheme() = true
         }
+
+        assertEquals("/settings", effects.pathname)
+        assertEquals("?theme=dark", effects.search)
+        assertEquals(true, effects.prefersDarkTheme())
     }
 
     @Test
-    fun storageFailuresAreContainedAndPortsAreReplaceable() {
-        val previous = BrowserStorage.localPort
-        try {
-            var stored: String? = null
-            BrowserStorage.localPort = object : BrowserStoragePort {
-                override fun read(key: String): String? = stored
-                override fun write(key: String, value: String) {
-                    stored = value
-                }
+    fun storageUsesInjectedPortsWithoutGlobalReplacement() {
+        val values = mutableMapOf<String, String>()
+        val storage = BrowserStorage(object : BrowserStorageRuntime {
+            override val localStorage = object : BrowserStoragePort {
+                override fun read(key: String): String? = values[key]
+                override fun write(key: String, value: String) { values[key] = value }
             }
+            override val sessionStorage = localStorage
+        })
 
-            BrowserStorage.write("key", "value")
+        storage.writeBestEffort(StorageKey("key"), "value")
 
-            assertEquals("value", BrowserStorage.read("key"))
-        } finally {
-            BrowserStorage.localPort = previous
-        }
+        assertEquals("value", storage.readOrNull(StorageKey("key")))
     }
 
     @Test
     fun storageExceptionsBecomeUnavailableValues() {
-        val previous = BrowserStorage.localPort
-        try {
-            BrowserStorage.localPort = object : BrowserStoragePort {
+        val storage = BrowserStorage(object : BrowserStorageRuntime {
+            override val localStorage = object : BrowserStoragePort {
                 override fun read(key: String): String? = error("blocked")
                 override fun write(key: String, value: String) = error("blocked")
             }
+            override val sessionStorage = localStorage
+        })
 
-            assertEquals(null, BrowserStorage.read("key"))
-            BrowserStorage.write("key", "value")
-        } finally {
-            BrowserStorage.localPort = previous
-        }
+        assertEquals(null, storage.readOrNull(StorageKey("key")))
+        storage.writeBestEffort(StorageKey("key"), "value")
+    }
+
+    @Test
+    fun unexpectedStorageExceptionsAreNotSilentlyDiscarded() {
+        val storage = BrowserStorage(object : BrowserStorageRuntime {
+            override val localStorage = object : BrowserStoragePort {
+                override fun read(key: String): String? = throw IllegalArgumentException("unexpected")
+                override fun write(key: String, value: String) = throw IllegalArgumentException("unexpected")
+            }
+            override val sessionStorage = localStorage
+        })
+
+        assertFailsWith<IllegalArgumentException> { storage.readOrNull(StorageKey("key")) }
+        assertFailsWith<IllegalArgumentException> { storage.writeBestEffort(StorageKey("key"), "value") }
     }
 }

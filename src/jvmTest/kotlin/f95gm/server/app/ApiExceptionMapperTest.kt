@@ -1,8 +1,8 @@
 package f95gm.server.app
 
 import f95gm.domain.api.F95ApiErrorCode
-import f95gm.server.http.response.ApiApplicationException
 import f95gm.server.http.response.ApiBadRequestException
+import f95gm.server.http.response.ApiCsrfException
 import io.ktor.http.*
 import java.io.IOException
 import kotlin.test.Test
@@ -20,7 +20,7 @@ class ApiExceptionMapperTest {
     @Test
     fun preservesApplicationExceptionMetadata() {
         val mapped = mapApiException(
-            ApiApplicationException(HttpStatusCode.Forbidden, "denied", F95ApiErrorCode.CSRF_REJECTED)
+            ApiCsrfException("denied")
         )
         assertEquals(HttpStatusCode.Forbidden, mapped?.status)
         assertEquals(F95ApiErrorCode.CSRF_REJECTED, mapped?.error?.code)

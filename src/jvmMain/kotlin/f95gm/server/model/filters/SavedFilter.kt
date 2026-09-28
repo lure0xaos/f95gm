@@ -1,5 +1,6 @@
 package f95gm.server.model.filters
 
+import f95gm.domain.api.FilterOptionRequest
 import f95gm.domain.defaults.F95Defaults
 import f95gm.domain.filters.F95Category
 import f95gm.domain.filters.F95SearchMode
@@ -19,11 +20,12 @@ internal data class SavedFilter(
     val search: String = F95Defaults.EMPTY,
     val creatorSearch: String = F95Defaults.EMPTY,
     val searchMode: F95SearchMode = F95SearchMode.TITLE,
-    val selectedTags: List<SavedFilterOption> = emptyList(),
-    val excludedTags: List<SavedFilterOption> = emptyList(),
-    val selectedPrefixes: List<SavedFilterOption> = emptyList(),
-    val excludedPrefixes: List<SavedFilterOption> = emptyList(),
+    val selectedTags: List<FilterOptionRequest> = emptyList(),
+    val excludedTags: List<FilterOptionRequest> = emptyList(),
+    val selectedPrefixes: List<FilterOptionRequest> = emptyList(),
+    val excludedPrefixes: List<FilterOptionRequest> = emptyList(),
     val tagType: F95TagType = F95TagType.OR,
     val dateLimit: Int = F95Defaults.ANY_DATE,
     val updatedAt: EpochMillis = EpochMillis(0L)
 )
+

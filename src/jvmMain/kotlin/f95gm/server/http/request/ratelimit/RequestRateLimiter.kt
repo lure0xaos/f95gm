@@ -1,76 +1,126 @@
 package f95gm.server.http.request.ratelimit
 
 import f95gm.server.http.request.RequestEndpoint
-import f95gm.server.state.runtime.ServerClock
-import f95gm.server.state.runtime.SystemServerClock
-import f95gm.server.state.runtime.elapsedAtLeast
-import f95gm.server.state.runtime.saturatingDouble
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
+import f95gm.server.kernel.ServerClock
+import f95gm.server.kernel.EntryCapacity
+import f95gm.server.kernel.BoundedAccessMap
+import f95gm.server.kernel.MonotonicMillis
+import f95gm.server.model.EpochMillis
+import f95gm.server.platform.SystemServerClock
+import f95gm.server.kernel.elapsedAtLeast
+import f95gm.server.kernel.saturatingDouble
+import f95gm.server.kernel.ResourceLock
+import f95gm.server.kernel.CloseGuard
+import f95gm.server.kernel.LifecycleResource
+import kotlin.time.Duration
 
 internal class RequestRateLimiter(
-    private val limit: Int,
-    private val windowMillis: Long,
+    limit: Int,
+    windowMillis: Long,
     private val clock: ServerClock = SystemServerClock,
-    private val maxEntries: Int = 4_096
-) : AutoCloseable {
-    internal data class Decision(val allowed: Boolean, val limit: Int, val remaining: Int, val resetAtMillis: Long)
+    maxEntries: Int = 4_096
+) : LifecycleResource {
+    private val closeGuard = CloseGuard()
+    internal data class RateLimitNow(val monotonic: MonotonicMillis, val epoch: EpochMillis)
+    private val capacity = EntryCapacity(maxEntries)
+
+    internal enum class Outcome { ALLOWED, REJECTED }
+    internal data class Decision(val outcome: Outcome, val limit: Int, val remaining: Int, val resetAtMillis: Long) {
+        internal constructor(allowed: Boolean, limit: Int, remaining: Int, resetAtMillis: Long) : this(
+            if (allowed) Outcome.ALLOWED else Outcome.REJECTED,
+            limit,
+            remaining,
+            resetAtMillis
+        )
+        val allowed: Boolean get() = outcome == Outcome.ALLOWED
+        val resetAt: EpochMillis get() = EpochMillis(resetAtMillis)
+    }
 
     init {
         require(limit > 0) { "limit must be positive" }
         require(windowMillis > 0) { "windowMillis must be positive" }
-        require(maxEntries > 0) { "maxEntries must be positive" }
+        require(capacity.value > 0) { "capacity must be positive" }
     }
 
     private data class BucketKey(val endpoint: RequestEndpoint, val client: String)
-    private data class Window(val startedAt: Long, val count: Int)
+    private data class Window(val startedAt: MonotonicMillis, val count: Int)
+    private val stateLock = ResourceLock()
+    private var policy = LimiterPolicy(limit, windowMillis)
+    private val buckets = BucketStore()
 
-    private val windows = ConcurrentHashMap<BucketKey, Window>()
-    private val cleanupCounter = AtomicLong()
+    private data class LimiterPolicy(val limit: Int, val windowMillis: Long)
+
+    private inner class BucketStore {
+        private val windows = BoundedAccessMap<BucketKey, Window>(capacity)
+        private var cleanupCounter = 0L
+
+        fun record(key: BucketKey, now: RateLimitNow, windowMillis: Long): DecisionData {
+            cleanupCounter++
+            if (cleanupCounter % 64L == 0L) {
+                windows.removeExpired { window ->
+                    elapsedAtLeast(now.monotonic.value, window.startedAt.value, saturatingDouble(windowMillis))
+                }
+            }
+            val current = windows[key]
+            val window = if (current == null || elapsedAtLeast(now.monotonic.value, current.startedAt.value, windowMillis)) {
+                Window(now.monotonic, 1)
+            } else {
+                current.copy(count = current.count.coerceAtMost(Int.MAX_VALUE - 1) + 1)
+            }
+            windows.put(key, window)
+            return DecisionData(
+                count = window.count,
+                resetAtMillis = saturatingAdd(
+                    now.epoch.value,
+                    (windowMillis - (now.monotonic.value - window.startedAt.value)).coerceAtLeast(0L)
+                )
+            )
+        }
+
+        fun clear() = windows.clear()
+    }
+
+    private data class DecisionData(val count: Int, val resetAtMillis: Long)
+
+    fun updatePolicy(limit: Int, windowMillis: Long) {
+        updatePolicy(RequestRateLimit(limit), RateLimitWindow.fromMillis(windowMillis))
+    }
+
+    fun updatePolicy(limit: RequestRateLimit, window: RateLimitWindow) {
+        stateLock.withLock {
+            policy = LimiterPolicy(limit.value, window.value)
+        }
+    }
 
     fun tryAcquire(
         key: String,
-        nowMillis: Long = clock.nowMillis(),
+        now: RateLimitNow? = null,
         endpoint: RequestEndpoint = RequestEndpoint.DEFAULT
     ): Boolean {
-        return tryAcquireDetailed(key, nowMillis, endpoint).allowed
+        return tryAcquireDetailed(key, now, endpoint).allowed
     }
 
     fun tryAcquireDetailed(
         key: String,
-        nowMillis: Long = clock.nowMillis(),
+        now: RateLimitNow? = null,
         endpoint: RequestEndpoint = RequestEndpoint.DEFAULT
-    ): Decision {
-        val bucketKey = BucketKey(endpoint, key)
-        if (cleanupCounter.incrementAndGet() % 64L == 0L) {
-            windows.entries.removeIf { (_, window) ->
-                elapsedAtLeast(
-                    nowMillis,
-                    window.startedAt,
-                    saturatingDouble(windowMillis)
-                )
-            }
-        }
-        val window = windows.compute(bucketKey) { _, current ->
-            if (current == null || elapsedAtLeast(nowMillis, current.startedAt, windowMillis)) Window(nowMillis, 1)
-            else current.copy(count = current.count.coerceAtMost(Int.MAX_VALUE - 1) + 1)
-        } ?: return Decision(false, limit, 0, nowMillis)
-        if (windows.size > maxEntries) {
-            windows.entries.minByOrNull { it.value.startedAt }?.let { windows.remove(it.key, it.value) }
-        }
-        return Decision(
-            allowed = window.count <= limit,
+    ): Decision = stateLock.withLock {
+        val currentPolicy = policy
+        val limit = currentPolicy.limit
+        val windowMillis = currentPolicy.windowMillis
+        val typedNow = now ?: RateLimitNow(clock.monotonicMillisTimestamp(), clock.epochMillis())
+        val data = buckets.record(BucketKey(endpoint, key), typedNow, windowMillis)
+        Decision(
+            outcome = if (data.count <= limit) Outcome.ALLOWED else Outcome.REJECTED,
             limit = limit,
-            remaining = (limit - window.count).coerceAtLeast(0),
-            resetAtMillis = saturatingAdd(window.startedAt, windowMillis)
+            remaining = (limit - data.count).coerceAtLeast(0),
+            resetAtMillis = data.resetAtMillis
         )
     }
-
-    fun tryAcquire(key: String, nowMillis: Long, endpoint: String): Boolean =
-        tryAcquire(key, nowMillis, RequestEndpoint(endpoint))
 
     private fun saturatingAdd(left: Long, right: Long): Long =
         if (Long.MAX_VALUE - left < right) Long.MAX_VALUE else left + right
 
-    override fun close() = windows.clear()
+    override val isClosed: Boolean get() = closeGuard.isClosed
+    override fun close() = closeGuard.closeOnce { stateLock.withLock { buckets.clear() } }
 }

@@ -4,9 +4,11 @@ import dev.fritz2.core.RenderContext
 import f95gm.client.model.detail.DetailSection
 import f95gm.client.ui.detail.metadata.detailCardMetaLabels
 import f95gm.client.ui.shared.content.richHtml
+import f95gm.client.state.runtime.ClientGalleryUiPort
 import f95gm.messages.UiMessages
 
 internal fun RenderContext.renderDetailBody(
+    runtime: ClientGalleryUiPort,
     overviewHtml: String,
     sections: List<DetailSection>,
     fallbackHtml: String
@@ -17,7 +19,7 @@ internal fun RenderContext.renderDetailBody(
     if (overviewHtml.isNotBlank()) {
         div("overview-card card border-primary-subtle mb-3") {
             detailCardHeader(UiMessages.app_overview(), "detail-overview", "bi bi-card-text me-2")
-            richHtml("overview-body collapse card-body detail-rich-content", overviewHtml, "detail-overview")
+            richHtml(runtime, "overview-body collapse card-body detail-rich-content", overviewHtml, "detail-overview")
         }
     }
 
@@ -28,7 +30,7 @@ internal fun RenderContext.renderDetailBody(
                 div("section-column col") {
                     div("section-card card h-100") {
                         detailCardHeader(section.title.value, bodyId)
-                        richHtml("section-body collapse card-body detail-rich-content", section.html.value, bodyId)
+                        richHtml(runtime, "section-body collapse card-body detail-rich-content", section.html.value, bodyId)
                     }
                 }
             }
@@ -36,6 +38,6 @@ internal fun RenderContext.renderDetailBody(
     }
 
     if (overviewHtml.isBlank() && richSections.isEmpty() && fallbackHtml.isNotBlank()) {
-        richHtml("fallback-body detail-rich-content", fallbackHtml)
+        richHtml(runtime, "fallback-body detail-rich-content", fallbackHtml)
     }
 }

@@ -42,4 +42,14 @@ class ParseDetailTest {
         assertEquals(emptyList(), detail.sections)
         assertEquals("", detail.bodyHtml.value)
     }
+
+    @Test
+    fun ignoresMalformedCollectionsAndUnknownFields() {
+        val detail = parseDetail(
+            """{"threadId":"42","meta":{},"sections":"bad","unknown":[1,2]}"""
+        )
+
+        assertEquals(emptyList(), detail.meta)
+        assertEquals(emptyList(), detail.sections)
+    }
 }

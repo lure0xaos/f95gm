@@ -5,15 +5,15 @@ import dev.fritz2.core.type
 import f95gm.client.routing.navigation.TypedRoute
 import f95gm.client.routing.navigation.filterRoute
 import f95gm.client.routing.navigation.router
-import f95gm.client.state.filters.savedFilters
+import f95gm.client.state.runtime.ClientSavedFiltersUiPort
 import f95gm.client.ui.shared.navigation.quickLinkNavigationButtonClass
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.savedFilterLinks() {
-    savedFilters.data.map { it.items }.distinctUntilChanged()
+internal fun RenderContext.savedFilterLinks(runtime: ClientSavedFiltersUiPort) {
+    runtime.savedFiltersView.data.map { it.items }.distinctUntilChanged()
         .combine(router.data.map { (it as? TypedRoute.LatestUpdates)?.filterId?.value }
             .distinctUntilChanged()) { items, activeFilterId ->
             items to activeFilterId

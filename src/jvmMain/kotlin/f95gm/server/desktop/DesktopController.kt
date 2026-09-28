@@ -1,22 +1,24 @@
 package f95gm.server.desktop
 
 import f95gm.messages.UiMessages
-import f95gm.server.config.logging.logger
+import f95gm.server.observability.logger
 import f95gm.server.desktop.console.ConsoleWindow
+import f95gm.server.desktop.console.ConsoleCaptureHandle
 import f95gm.server.desktop.console.use
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
+import java.io.IOException
 import javax.imageio.ImageIO
 
-internal class DesktopController(private val requestShutdown: () -> Unit) {
+internal class DesktopController(private val requestShutdown: () -> Unit) : DesktopLifecycle {
     private var trayIcon: TrayIcon? = null
     private var trayMenu: TrayMenu? = null
 
-    fun start() {
-        runCatching {
-            if (!SystemTray.isSupported()) return@runCatching
+    override fun start() {
+        try {
+            if (!SystemTray.isSupported()) return
 
             val menu = TrayMenu(ConsoleWindow::show, requestShutdown)
             val icon = TrayIcon(trayImage(), UiMessages.app_brandName()).apply {
@@ -35,26 +37,35 @@ internal class DesktopController(private val requestShutdown: () -> Unit) {
             trayIcon = icon
             trayMenu = menu
             updateTooltip(UiMessages.app_trayServerStarted())
-        }.onFailure { error ->
+        } catch (error: AWTException) {
+            logger.warn(error) { "Could not initialize the system tray" }
+        } catch (error: IllegalArgumentException) {
             logger.warn(error) { "Could not initialize the system tray" }
         }
     }
 
-    fun updateTheme(theme: String?) {
+    override fun updateTheme(theme: DesktopTheme?) {
         trayMenu?.updateTheme(theme)
     }
 
     private fun updateTooltip(message: String) {
-        runCatching {
+        try {
             trayIcon?.toolTip = "${UiMessages.app_brandName()} — $message"
+        } catch (error: IllegalArgumentException) {
+            // AWT can reject updates while the desktop session is shutting down.
+            logger.debug(error) { "Could not update the system-tray tooltip" }
         }
     }
 
-    fun dispose() {
+    override fun dispose() {
         updateTooltip(UiMessages.app_trayServerStopped())
         trayMenu?.dispose()
         trayIcon?.let { icon ->
-            runCatching { SystemTray.getSystemTray().remove(icon) }
+            try {
+                SystemTray.getSystemTray().remove(icon)
+            } catch (error: IllegalArgumentException) {
+                logger.debug(error) { "Could not remove the system-tray icon" }
+            }
         }
         trayIcon = null
         trayMenu = null
@@ -62,14 +73,17 @@ internal class DesktopController(private val requestShutdown: () -> Unit) {
     }
 
     companion object {
-        fun installConsoleCapture() {
-            ConsoleWindow.installOutputCapture()
+        fun installConsoleCapture(): ConsoleCaptureHandle {
+            return ConsoleWindow.installOutputCapture()
         }
     }
 
-    private fun trayImage(): Image = runCatching {
+    private fun trayImage(): Image = try {
         DesktopController::class.java.getResourceAsStream("/static/favicon.png")?.use(ImageIO::read)
-    }.getOrNull() ?: fallbackTrayImage()
+    } catch (error: IOException) {
+        logger.debug(error) { "Could not load the system-tray image" }
+        null
+    } ?: fallbackTrayImage()
 
     private fun fallbackTrayImage(): Image {
         val image = BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB)

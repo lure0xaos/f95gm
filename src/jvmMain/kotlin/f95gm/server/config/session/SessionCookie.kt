@@ -1,5 +1,5 @@
 package f95gm.server.config.session
 
-import f95gm.server.config.constants.ServerConstants
+import f95gm.server.config.protocol.SessionProtocolConfig
 
-internal const val sessionCookie = ServerConstants.SESSION_COOKIE
+internal const val sessionCookie = SessionProtocolConfig.BROWSER_COOKIE

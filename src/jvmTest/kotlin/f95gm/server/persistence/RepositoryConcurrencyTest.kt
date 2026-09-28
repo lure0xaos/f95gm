@@ -1,11 +1,18 @@
 package f95gm.server.persistence
 
+import f95gm.server.persistence.database.testDatabaseExecutionContext
+
 import f95gm.domain.tracking.GameTrackingState
 import f95gm.domain.values.F95AccountKey
+import f95gm.domain.values.F95OptionId
+import f95gm.domain.values.F95OptionName
 import f95gm.domain.values.F95ThreadId
 import f95gm.domain.values.StoredVersion
 import f95gm.server.model.EpochMillis
+import f95gm.server.model.ConditionalWriteResult
 import f95gm.server.model.marks.GameMark
+import f95gm.server.model.filters.SavedFilter
+import f95gm.domain.api.FilterOptionRequest
 import f95gm.server.persistence.database.DatabaseExecutor
 import f95gm.server.persistence.database.migrateDatabase
 import kotlinx.coroutines.Dispatchers
@@ -16,16 +23,17 @@ import kotlinx.coroutines.test.runTest
 import org.jetbrains.exposed.v1.jdbc.Database
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class RepositoryConcurrencyTest {
     @Test
     fun independentAccountsCanWriteConcurrentlyWithoutCrossAccountLoss() = runTest {
         val database = Database.connect(
-            url = "jdbc:h2:mem:repository_concurrent_${System.nanoTime()};DB_CLOSE_DELAY=-1",
+            url = testDatabaseUrl("repository_concurrent"),
             driver = "org.h2.Driver"
         )
         migrateDatabase(database)
-        val repositories = ServerRepositories(DatabaseExecutor(database = { database }))
+        val repositories = ServerRepositories(DatabaseExecutor(database = { database }, executionContext = testDatabaseExecutionContext()))
         val mark = GameMark(
             threadId = F95ThreadId("123"),
             trackingState = GameTrackingState.WATCHING,
@@ -49,11 +57,11 @@ class RepositoryConcurrencyTest {
     @Test
     fun staleMarkWriteIsRejectedWithoutOverwritingTheCurrentValue() = runTest {
         val database = Database.connect(
-            url = "jdbc:h2:mem:repository_${System.nanoTime()};DB_CLOSE_DELAY=-1",
+            url = testDatabaseUrl("repository"),
             driver = "org.h2.Driver"
         )
         migrateDatabase(database)
-        val repositories = ServerRepositories(DatabaseExecutor(database = { database }))
+        val repositories = ServerRepositories(DatabaseExecutor(database = { database }, executionContext = testDatabaseExecutionContext()))
         val account = F95AccountKey("account")
         val mark = GameMark(
             threadId = F95ThreadId("123"),
@@ -64,9 +72,33 @@ class RepositoryConcurrencyTest {
 
         assertEquals(ConditionalWriteResult.Stored(Unit), repositories.marks.storeIfCurrent(account, mark, null))
         assertEquals(
-            ConditionalWriteResult.Conflict,
-            repositories.marks.storeIfCurrent(account, mark.copy(updatedAt = EpochMillis(30)), 10L)
+            ConditionalWriteResult.Conflict(expectedUpdatedAt = EpochMillis(10L), actualUpdatedAt = EpochMillis(20L)),
+            repositories.marks.storeIfCurrent(account, mark.copy(updatedAt = EpochMillis(30)), EpochMillis(10L))
         )
         assertEquals(listOf(mark), repositories.marks.load(account))
     }
+
+    @Test
+    fun failedSavedFilterWriteRollsBackFilterAndOptionsTogether() = runTest {
+        val database = Database.connect(
+            url = testDatabaseUrl("repository_filter_rollback"),
+            driver = "org.h2.Driver"
+        )
+        migrateDatabase(database)
+        val repositories = ServerRepositories(DatabaseExecutor(database = { database }, executionContext = testDatabaseExecutionContext()))
+        val duplicateOption = FilterOptionRequest(F95OptionId("tag-1"), F95OptionName("Tag"))
+
+        assertFailsWith<Exception> {
+            repositories.savedFilters.store(
+                F95AccountKey("account"),
+                SavedFilter(
+                    name = f95gm.domain.values.F95OptionName("Rollback"),
+                    selectedTags = listOf(duplicateOption, duplicateOption)
+                )
+            )
+        }
+
+        assertEquals(emptyList(), repositories.savedFilters.load(F95AccountKey("account")))
+    }
 }
+

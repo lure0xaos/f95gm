@@ -31,5 +31,16 @@ class ApiErrorContractTest {
         )
         assertEquals(F95ApiMessageKey("server.invalidJsonRequest"), decoded.messageKey)
         assertEquals("name", decoded.details["field"])
+        assertEquals("name", decoded.typedDetails.field)
+    }
+
+    @Test
+    fun preservesUnknownErrorDetailsAsTypedExtensions() {
+        val decoded = Json.decodeFromString<F95ApiError>(
+            "{\"message\":\"bad\",\"details\":{\"traceId\":\"abc\",\"field\":\"name\"}}"
+        )
+
+        assertEquals("abc", decoded.typedDetails.extensions["traceId"])
+        assertEquals("name", decoded.typedDetails.field)
     }
 }

@@ -17,8 +17,8 @@ class StaticPathTest {
 
     @Test
     fun normalizesSafePaths() {
-        assertEquals("assets/app.js", safeStaticPath("assets/./app.js"))
-        assertEquals("index.html", safeStaticPath(""))
+        assertEquals("assets/app.js", safeStaticPath("assets/./app.js")?.value)
+        assertEquals("index.html", safeStaticPath("")?.value)
     }
 
     @Test
@@ -49,8 +49,11 @@ class StaticPathTest {
 
     @Test
     fun rejectsMissingOrNonFileOverrideTargets() {
-        assertNull(resolveOverrideRoot("C:/path/that/does/not/exist"))
-        assertNull(resolveOverrideFile(Path.of("C:/path/that/does/not/exist"), "index.html"))
+        assertEquals(StaticFileResolution.Missing, resolveOverrideRoot("C:/path/that/does/not/exist"))
+        assertEquals(
+            StaticFileResolution.Missing,
+            resolveOverrideFile(Path.of("C:/path/that/does/not/exist"), "index.html")
+        )
     }
 
     @Test
@@ -68,5 +71,22 @@ class StaticPathTest {
         listOf("../x", "a/../../x", "%2e%2e/x", "a%2fb").forEach { path ->
             assertNull(safeStaticPath(path), path)
         }
+    }
+
+    @Test
+    fun filesystemSecurityAndIoFailuresRemainDistinguishableFromMissingResources() {
+        val securityFailure = object : StaticFileSystem {
+            override fun resolveRoot(directory: String) = StaticFileResolution.Failed(StaticFileFailure.SECURITY)
+            override fun resolveFile(root: Path, requested: String) = StaticFileResolution.Failed(StaticFileFailure.SECURITY)
+        }
+        val ioFailure = object : StaticFileSystem {
+            override fun resolveRoot(directory: String) = StaticFileResolution.Failed(StaticFileFailure.IO)
+            override fun resolveFile(root: Path, requested: String) = StaticFileResolution.Failed(StaticFileFailure.IO)
+        }
+
+        assertEquals(StaticFileFailure.SECURITY, (resolveOverrideRoot("static", securityFailure) as StaticFileResolution.Failed).failure)
+        assertEquals(StaticFileFailure.SECURITY, (resolveOverrideFile(Path.of("static"), "index.html", securityFailure) as StaticFileResolution.Failed).failure)
+        assertEquals(StaticFileFailure.IO, (resolveOverrideRoot("static", ioFailure) as StaticFileResolution.Failed).failure)
+        assertEquals(StaticFileFailure.IO, (resolveOverrideFile(Path.of("static"), "index.html", ioFailure) as StaticFileResolution.Failed).failure)
     }
 }

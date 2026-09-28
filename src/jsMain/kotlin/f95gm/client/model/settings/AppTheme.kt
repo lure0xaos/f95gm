@@ -1,16 +1,16 @@
 package f95gm.client.model.settings
 
-import f95gm.client.state.runtime.BrowserRuntime
+import f95gm.client.state.runtime.BrowserEffects
 
 internal enum class AppTheme(val bootstrapValue: String) {
     DARK("dark"),
     LIGHT("light"),
     SYSTEM("auto");
 
-    fun desktopValue(): String = when (this) {
+    fun desktopValue(browser: BrowserEffects): String = when (this) {
         DARK -> DARK.bootstrapValue
         LIGHT -> LIGHT.bootstrapValue
-        SYSTEM -> if (BrowserRuntime.prefersDarkTheme()) {
+        SYSTEM -> if (browser.prefersDarkTheme()) {
             DARK.bootstrapValue
         } else {
             LIGHT.bootstrapValue

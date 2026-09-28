@@ -6,11 +6,12 @@ import io.ktor.http.*
 
 internal class ApiUpstreamException(
     message: String = "Upstream request failed",
-    details: Map<String, String> = emptyMap()
+    details: ApiFailureDetails = ApiFailureDetails.EMPTY
 ) : ApiApplicationException(
     HttpStatusCode.BadGateway,
     message,
     F95ApiErrorCode.UPSTREAM_FAILURE,
     F95ApiMessageKey("server.upstreamFailure"),
-    details
+    details,
+    kind = ApiFailureKind.Upstream
 )

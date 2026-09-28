@@ -1,5 +1,7 @@
 package f95gm.client.state.config
 
+import f95gm.client.state.dropdown.DropdownSearchKey
+
 internal object ClientConstants {
     const val TOAST_DURATION_MILLIS = 6000L
     const val REQUEST_TIMEOUT_MILLIS = 30_000L
@@ -17,6 +19,6 @@ internal object ClientConstants {
     const val BYTE_MASK = 0xff
     const val HEX_RADIX = 16
     const val HEX_DIGITS = 2
-    const val SEARCH_IN_KEY = "searchIn"
-    const val DATE_LIMIT_KEY = "dateLimit"
+    val SEARCH_IN_KEY = DropdownSearchKey("searchIn")
+    val DATE_LIMIT_KEY = DropdownSearchKey("dateLimit")
 }

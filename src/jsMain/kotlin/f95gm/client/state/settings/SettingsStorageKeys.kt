@@ -1,9 +1,11 @@
 package f95gm.client.state.settings
 
+import f95gm.client.state.runtime.StorageKey
+
 internal object SettingsStorageKeys {
-    const val THEME = "f95gm.settings.theme"
-    const val LAZY_LOAD_IMAGES = "f95gm.settings.lazyLoadImages"
-    const val UPDATE_CHECK_INTERVAL = "f95gm.settings.updateCheckInterval"
-    const val PAGE_SIZE = "f95gm.settings.pageSize"
-    const val CARD_SIZE = "f95gm.settings.cardSize"
+    val THEME = StorageKey("f95gm.settings.theme")
+    val LAZY_LOAD_IMAGES = StorageKey("f95gm.settings.lazyLoadImages")
+    val UPDATE_CHECK_INTERVAL = StorageKey("f95gm.settings.updateCheckInterval")
+    val PAGE_SIZE = StorageKey("f95gm.settings.pageSize")
+    val CARD_SIZE = StorageKey("f95gm.settings.cardSize")
 }

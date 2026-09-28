@@ -19,27 +19,29 @@ class ServerHttpPoliciesTest {
                 "f95gm.retryMaxDelayMillis" to "900"
             )
         )
-        val policies = ServerHttpPolicies.from(config)
+        val httpPolicies = ServerHttpPolicies.from(config)
+        val upstreamPolicies = ServerUpstreamPolicies.from(config)
 
-        assertEquals(Millis(12_000), policies.clientTimeouts.requestMillis)
-        assertEquals(Millis(2_000), policies.clientTimeouts.connectMillis)
-        assertEquals(Millis(8_000), policies.clientTimeouts.socketMillis)
-        assertEquals(4, policies.upstream.maxAttempts)
-        assertEquals(100.milliseconds, policies.upstream.retryBaseDelay)
-        assertEquals(900.milliseconds, policies.upstream.retryMaxDelay)
-        assertEquals(12_000.milliseconds, policies.upstream.requestTimeout)
+        assertEquals(Millis(12_000), httpPolicies.clientTimeouts.requestMillis)
+        assertEquals(Millis(2_000), httpPolicies.clientTimeouts.connectMillis)
+        assertEquals(Millis(8_000), httpPolicies.clientTimeouts.socketMillis)
+        assertEquals(4, upstreamPolicies.request.maxAttempts)
+        assertEquals(100.milliseconds, upstreamPolicies.request.retryBaseDelay)
+        assertEquals(900.milliseconds, upstreamPolicies.request.retryMaxDelay)
+        assertEquals(12_000.milliseconds, upstreamPolicies.request.requestTimeout)
     }
 
     @Test
     fun derivesDefaultPoliciesFromDefaultConfiguration() {
-        val policies = ServerHttpPolicies.from(ServerConfig.from(emptyMap()))
+        val httpPolicies = ServerHttpPolicies.from(ServerConfig.from(emptyMap()))
+        val upstreamPolicies = ServerUpstreamPolicies.from(ServerConfig.from(emptyMap()))
 
-        assertEquals(Millis(30_000), policies.clientTimeouts.requestMillis)
-        assertEquals(Millis(10_000), policies.clientTimeouts.connectMillis)
-        assertEquals(Millis(30_000), policies.clientTimeouts.socketMillis)
-        assertEquals(3, policies.upstream.maxAttempts)
-        assertEquals(250.milliseconds, policies.upstream.retryBaseDelay)
-        assertEquals(30_000.milliseconds, policies.upstream.retryMaxDelay)
-        assertEquals(30_000.milliseconds, policies.upstream.requestTimeout)
+        assertEquals(Millis(30_000), httpPolicies.clientTimeouts.requestMillis)
+        assertEquals(Millis(10_000), httpPolicies.clientTimeouts.connectMillis)
+        assertEquals(Millis(30_000), httpPolicies.clientTimeouts.socketMillis)
+        assertEquals(3, upstreamPolicies.request.maxAttempts)
+        assertEquals(250.milliseconds, upstreamPolicies.request.retryBaseDelay)
+        assertEquals(30_000.milliseconds, upstreamPolicies.request.retryMaxDelay)
+        assertEquals(30_000.milliseconds, upstreamPolicies.request.requestTimeout)
     }
 }

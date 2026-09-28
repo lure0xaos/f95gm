@@ -1,7 +1,6 @@
 package f95gm.server.http.request
 
 import f95gm.server.app.configureTestRoutes
-import f95gm.server.config.constants.ServerConstants
 import f95gm.server.desktop.ServerShutdownController
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -20,7 +19,7 @@ class RequestContextTest {
     @Test
     fun requestContextRemainsBoundToTheIndividualCall() = testApplication {
         application {
-            configureTestRoutes("shutdown-token", { ServerShutdownController {} }, { null })
+            configureTestRoutes("shutdown-token", { ServerShutdownController {} }, { f95gm.server.desktop.NoopDesktopLifecycle })
             routing {
                 get("/context-probe") {
                     val requestId = call.requestContext.requestId.value
@@ -37,7 +36,7 @@ class RequestContextTest {
             val responses = (1..8).map { index ->
                 async {
                     client.get("/context-probe") {
-                        header(ServerConstants.REQUEST_ID_HEADER, "test-request-$index")
+                        header(f95gm.server.config.protocol.HttpProtocolConfig.REQUEST_ID_HEADER, "test-request-$index")
                     }.bodyAsText()
                 }
             }.awaitAll()
@@ -48,7 +47,7 @@ class RequestContextTest {
     @Test
     fun requestIdIsPropagatedToTheLoggingMdc() = testApplication {
         application {
-            configureTestRoutes("shutdown-token", { ServerShutdownController {} }, { null })
+            configureTestRoutes("shutdown-token", { ServerShutdownController {} }, { f95gm.server.desktop.NoopDesktopLifecycle })
             routing {
                 get("/context-mdc") {
                     call.respondText(MDC.get("requestId") ?: "missing")
@@ -57,7 +56,7 @@ class RequestContextTest {
         }
 
         assertEquals("mdc-request", client.get("/context-mdc") {
-            header(ServerConstants.REQUEST_ID_HEADER, "mdc-request")
+            header(f95gm.server.config.protocol.HttpProtocolConfig.REQUEST_ID_HEADER, "mdc-request")
         }.bodyAsText())
     }
 }

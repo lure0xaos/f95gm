@@ -1,13 +1,15 @@
 package f95gm.server.upstream.html
 
-import f95gm.server.config.upstream.upstream
-import f95gm.server.upstream.media.normalizedMediaSource
+import f95gm.server.upstream.media.normalizedMediaUrl
 import f95gm.server.upstream.media.proxyMediaUrl
 import f95gm.server.upstream.media.thumbnailMediaSource
+import f95gm.server.upstream.request.UpstreamUrlPolicy
+import f95gm.server.upstream.request.UpstreamPath
+import f95gm.server.config.upstream.UpstreamBaseUrl
 import org.jsoup.Jsoup
 
-internal fun sanitizeThreadHtml(html: String): SanitizedHtml {
-    val document = Jsoup.parseBodyFragment(html, upstream)
+internal fun sanitizeThreadHtml(html: String, baseUrl: UpstreamBaseUrl): SanitizedHtml {
+    val document = Jsoup.parseBodyFragment(html, UpstreamUrlPolicy.baseUrl(UpstreamPath("/"), baseUrl))
     document.select("script, style, iframe, object, embed, form, button, noscript").remove()
     document.select("*").forEach { element ->
         element.attributes().asList().map { it.key }.forEach { attribute ->
@@ -23,7 +25,7 @@ internal fun sanitizeThreadHtml(html: String): SanitizedHtml {
             val rawValue = element.attr(attribute).trim()
             val value = when {
                 rawValue.startsWith("//") -> "https:$rawValue"
-                rawValue.startsWith("/") -> upstream + rawValue
+            rawValue.startsWith("/") -> UpstreamUrlPolicy.baseUrl(UpstreamPath(rawValue), baseUrl)
                 else -> rawValue
             }
             when {
@@ -46,17 +48,20 @@ internal fun sanitizeThreadHtml(html: String): SanitizedHtml {
     }
     val cleaned = threadHtmlCleaner.clean(document)
     cleaned.outputSettings().prettyPrint(false)
-    val result = Jsoup.parseBodyFragment(cleaned.body().html(), upstream)
+    val result = Jsoup.parseBodyFragment(
+        cleaned.body().html(),
+        UpstreamUrlPolicy.baseUrl(UpstreamPath("/"), baseUrl)
+    )
     result.select("a[href]").forEach { link ->
-        val source = normalizedMediaSource(link.attr("href")) ?: return@forEach
+        val source = normalizedMediaUrl(link.attr("href"), baseUrl) ?: return@forEach
         link.attr("href", proxyMediaUrl(source))
         val image = link.selectFirst("img") ?: return@forEach
-        val imageSource = normalizedMediaSource(image.attr("src"))
+        val imageSource = normalizedMediaUrl(image.attr("src"), baseUrl)
             ?: thumbnailMediaSource(source)
         image.attr("src", proxyMediaUrl(imageSource))
     }
     result.select("img[src]").forEach { image ->
-        normalizedMediaSource(image.attr("src"))?.let { source ->
+        normalizedMediaUrl(image.attr("src"), baseUrl)?.let { source ->
             image.attr("src", proxyMediaUrl(source))
         }
         image.attr("loading", "lazy")

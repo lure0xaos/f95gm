@@ -1,25 +1,27 @@
 package f95gm.client.ui.shared.cards
 
 import dev.fritz2.core.*
-import f95gm.client.actions.images.imageLoadFailed
-import f95gm.client.actions.images.retryImage
 import f95gm.client.data.presentation.formatRating
 import f95gm.client.state.config.ClientConstants
-import f95gm.client.state.images.imageRetry
-import f95gm.client.state.settings.appSettings
+import f95gm.client.state.runtime.ClientCardUiPort
+import f95gm.client.model.images.MediaSource
 import f95gm.client.ui.shared.navigation.secondaryNavigationButtonClass
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 internal fun RenderContext.gameCardContent(
+    runtime: ClientCardUiPort,
     card: GameCardData,
     badges: RenderContext.() -> Unit = {}
 ) {
+    val imageRetry = runtime.imageRetryView
+    val coverSource = MediaSource(card.cover)
+    val appSettings = runtime.appSettingsView
     div("game-cover position-relative ratio ratio-16x9 overflow-hidden rounded-top bg-body-secondary") {
         if (card.cover.isNotBlank()) {
             imageRetry.data
-                .map { it.failedSources.contains(card.cover) to (it.attempts[card.cover] ?: 0) }
+                .map { it.failedSources.contains(coverSource) to (it.attempts[coverSource] ?: 0) }
                 .distinctUntilChanged()
                 .render { (failed, attempt) ->
                     if (failed) {
@@ -32,22 +34,21 @@ internal fun RenderContext.gameCardContent(
                                 clicks {
                                     stopPropagation()
                                     preventDefault()
-                                } handledBy { retryImage(card.cover) }
+                                } handledBy { runtime.imagesCommands.retryImage(coverSource) }
                             }
                         }
                     } else {
                         img("img-fluid w-100 h-100 object-fit-cover position-absolute top-0 start-0") {
                             alt(card.title)
                             src(
-                                if (attempt == 0) card.cover
-                                else card.cover + if ('?' in card.cover) "&retry=$attempt" else "?retry=$attempt"
+                                coverSource.withRetry(attempt)
                             )
                             attr("width", ClientConstants.GAME_COVER_WIDTH.toString())
                             attr("height", ClientConstants.GAME_COVER_HEIGHT.toString())
                             attr("loading", appSettings.data.map { if (it.lazyLoadImages) "lazy" else "eager" })
                             attr("decoding", "async")
                             sizes("(min-width: 1400px) 25vw, (min-width: 992px) 33vw, (min-width: 576px) 50vw, 100vw")
-                            errors handledBy { imageLoadFailed(card.cover) }
+                            errors handledBy { runtime.imagesCommands.imageLoadFailed(coverSource) }
                         }
                     }
                 }

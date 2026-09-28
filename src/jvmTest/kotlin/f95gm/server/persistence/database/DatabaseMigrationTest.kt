@@ -1,5 +1,7 @@
 package f95gm.server.persistence.database
 
+import f95gm.server.persistence.database.migration.*
+import f95gm.server.persistence.testDatabaseUrl
 import f95gm.server.persistence.schema.*
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
@@ -15,9 +17,45 @@ import kotlin.test.assertFailsWith
 
 class DatabaseMigrationTest {
     @Test
+    fun migrationCleanupPolicyRetainsLegacyFixturesUntilTheNextSchemaGeneration() {
+        assertEquals(true, MigrationCleanupPolicy.retains(CURRENT_SCHEMA_VERSION))
+        assertEquals(false, MigrationCleanupPolicy.retains(MigrationCleanupPolicy.REMOVE_LEGACY_FIXTURES_AFTER_VERSION))
+    }
+
+    @Test
+    fun migrationRegistryDescribesTheCurrentSchemaAndIsContiguous() {
+        assertEquals(CURRENT_SCHEMA_VERSION, migrationRegistry.last().version.value)
+        assertEquals(CURRENT_SCHEMA_CHECKSUM, migrationRegistry.last().checksum.value)
+        assertEquals(migrationRegistry.indices.map { it + 1 }, migrationRegistry.map { it.version.value })
+    }
+
+    @Test
+    fun migrationRegistryRejectsSkippedVersionsAndBlankChecksums() {
+        assertFailsWith<IllegalArgumentException> {
+            validateMigrationRegistry(listOf(migration(1, "v1", "one"), migration(3, "v3", "three")))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            validateMigrationRegistry(listOf(migration(1, "", "one")))
+        }
+    }
+
+    @Test
+    fun migrationPlanMakesRollbackSupportExplicit() {
+        val registry = listOf(
+            migration(1, "v1", "one", rollbackSupported = true),
+            migration(2, "v2", "two", rollbackSupported = false)
+        )
+        assertEquals(
+            listOf(MigrationDirection.APPLY, MigrationDirection.APPLY),
+            migrationPlan(0, 2, registry).map(MigrationStep::direction)
+        )
+        assertFailsWith<IllegalArgumentException> { migrationPlan(2, 0, registry) }
+    }
+
+    @Test
     fun migrationIsRepeatableAndRecordsTheCurrentVersion() {
         val database = Database.connect(
-            url = "jdbc:h2:mem:migration_${System.nanoTime()};DB_CLOSE_DELAY=-1",
+            url = testDatabaseUrl("migration"),
             driver = "org.h2.Driver"
         )
 
@@ -37,9 +75,44 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    fun registeredRollbackRunsTransactionallyAndRewindsVersion() {
+        val database = Database.connect(
+            url = testDatabaseUrl("rollback"),
+            driver = "org.h2.Driver"
+        )
+
+        migrateDatabase(database)
+        rollbackDatabase(database, 0)
+
+        transaction(database) {
+            assertEquals(0, SchemaVersionTable.selectAll().single()[SchemaVersionTable.version])
+            assertEquals(0L, SchemaMigrationChecksumTable.selectAll().count())
+        }
+    }
+
+    @Test
+    fun rollbackFailureRestoresTheVersionAndSchemaAtomically() {
+        val database = Database.connect(
+            url = testDatabaseUrl("rollback_failure"),
+            driver = "org.h2.Driver"
+        )
+        migrateDatabase(database)
+
+        assertFailsWith<IllegalStateException> {
+            rollbackDatabase(database, 0) { error("injected rollback failure") }
+        }
+
+        transaction(database) {
+            assertEquals(CURRENT_SCHEMA_VERSION, SchemaVersionTable.selectAll().single()[SchemaVersionTable.version])
+            assertEquals(CURRENT_SCHEMA_CHECKSUM, SchemaMigrationChecksumTable.selectAll().single()[SchemaMigrationChecksumTable.checksum])
+            assertEquals(0L, SessionsTable.selectAll().count())
+        }
+    }
+
+    @Test
     fun upgradesAnExplicitLegacyVersionZeroFixture() {
         val database = Database.connect(
-            url = "jdbc:h2:mem:legacy_migration_${System.nanoTime()};DB_CLOSE_DELAY=-1",
+            url = testDatabaseUrl("legacy_migration"),
             driver = "org.h2.Driver"
         )
         transaction(database) {
@@ -65,7 +138,7 @@ class DatabaseMigrationTest {
     @Test
     fun rejectsAChangedHistoricalMigrationChecksum() {
         val database = Database.connect(
-            url = "jdbc:h2:mem:checksum_${System.nanoTime()};DB_CLOSE_DELAY=-1",
+            url = testDatabaseUrl("checksum"),
             driver = "org.h2.Driver"
         )
         migrateDatabase(database)
@@ -75,12 +148,15 @@ class DatabaseMigrationTest {
             }
         }
         assertFailsWith<IllegalArgumentException> { migrateDatabase(database) }
+        transaction(database) {
+            assertEquals(0L, SessionsTable.selectAll().count())
+        }
     }
 
     @Test
     fun `rejects a database from the future`() {
         val database = Database.connect(
-            url = "jdbc:h2:mem:future_migration_${System.nanoTime()};DB_CLOSE_DELAY=-1",
+            url = testDatabaseUrl("future_migration"),
             driver = "org.h2.Driver"
         )
         transaction(database) {
@@ -96,7 +172,7 @@ class DatabaseMigrationTest {
 
     @Test
     fun concurrentInitializationsShareOneMigrationLock() {
-        val url = "jdbc:h2:mem:concurrent_migration_${System.nanoTime()};DB_CLOSE_DELAY=-1"
+        val url = testDatabaseUrl("concurrent_migration")
         val databases = List(2) {
             Database.connect(url = url, driver = "org.h2.Driver")
         }
@@ -115,4 +191,17 @@ class DatabaseMigrationTest {
             })
         }
     }
+
+    private fun migration(
+        version: Int,
+        checksum: String,
+        description: String,
+        rollbackSupported: Boolean = false
+) = DatabaseMigration(
+        version = DatabaseSchemaVersion(version),
+        checksum = MigrationChecksum(checksum),
+        description = description,
+        apply = {},
+        rollback = if (rollbackSupported) ({}) else null
+    )
 }

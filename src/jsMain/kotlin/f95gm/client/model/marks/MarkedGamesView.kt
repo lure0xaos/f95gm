@@ -11,17 +11,17 @@ internal fun markedGamesView(state: MarksState): MarkedGamesView {
                 mark.developer.value.contains(search, ignoreCase = true)
     }
     val sorted = when (state.sort) {
-        F95Sort.DATE_ASC.wireValue -> filtered.sortedWith(
+        F95Sort.DATE_ASC -> filtered.sortedWith(
             compareBy<MarkedGame> { it.updatedAt.value }
                 .thenBy { it.title.value.lowercase() }
         )
 
-        F95Sort.TITLE.wireValue -> filtered.sortedWith(
+        F95Sort.TITLE -> filtered.sortedWith(
             compareBy<MarkedGame> { it.title.value.lowercase() }
                 .thenBy { it.developer.value.lowercase() }
         )
 
-        F95Sort.TITLE_DESC.wireValue -> filtered.sortedWith(
+        F95Sort.TITLE_DESC -> filtered.sortedWith(
             compareByDescending<MarkedGame> { it.title.value.lowercase() }
                 .thenByDescending { it.developer.value.lowercase() }
         )

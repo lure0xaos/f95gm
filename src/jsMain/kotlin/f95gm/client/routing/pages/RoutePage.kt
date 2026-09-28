@@ -1,5 +1,5 @@
 package f95gm.client.routing.pages
 
-import f95gm.domain.api.F95Api
+import f95gm.domain.api.F95ApiQueryParameters
 
-internal const val routePage = F95Api.PAGE
+internal val routePage = F95ApiQueryParameters.PAGE.value

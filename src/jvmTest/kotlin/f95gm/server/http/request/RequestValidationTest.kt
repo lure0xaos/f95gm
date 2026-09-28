@@ -2,7 +2,7 @@ package f95gm.server.http.request
 
 import f95gm.domain.api.F95ApiErrorCode
 import f95gm.domain.api.F95MarkRequest
-import f95gm.server.http.response.ServerMessageKeys
+import f95gm.server.http.response.ServerMessageKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -23,7 +23,7 @@ class RequestValidationTest {
 
         assertEquals(F95ApiErrorCode.INVALID_INPUT, invalid.code)
         assertEquals("Invalid JSON request", invalid.message)
-        assertEquals(ServerMessageKeys.INVALID_JSON_REQUEST, invalid.messageKey)
+        assertEquals(ServerMessageKey.INVALID_JSON_REQUEST, invalid.messageKey)
         assertEquals(null, invalid.field)
     }
 
@@ -32,14 +32,15 @@ class RequestValidationTest {
         val invalid = RequestValidation.Invalid.field(
             F95ApiErrorCode.INVALID_INPUT,
             "bad value",
-            ServerMessageKeys.INVALID_TRACKING_STATE,
+            ServerMessageKey.INVALID_TRACKING_STATE,
             "trackingState"
         )
 
         val failure = invalid.toApiFailure()
 
         assertEquals("bad value", failure.message)
-        assertEquals(ServerMessageKeys.INVALID_TRACKING_STATE, failure.key)
+        assertEquals(ServerMessageKey.INVALID_TRACKING_STATE, failure.key)
         assertEquals(mapOf("field" to "trackingState"), failure.details.asMap())
     }
 }
+

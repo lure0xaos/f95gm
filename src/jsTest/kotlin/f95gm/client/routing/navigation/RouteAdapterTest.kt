@@ -4,6 +4,7 @@ import f95gm.client.routing.pages.Pages
 import f95gm.client.routing.pages.routeFilterId
 import f95gm.client.routing.pages.routePage
 import f95gm.client.routing.pages.routeThreadId
+import f95gm.client.routing.navigation.serialization.RouteParameters
 import f95gm.domain.values.F95FilterId
 import f95gm.domain.values.F95ThreadId
 import kotlin.test.Test
@@ -11,7 +12,7 @@ import kotlin.test.assertEquals
 
 class RouteAdapterTest {
     @Test
-    fun allTypedRoutesRoundTripThroughTheLegacyMap() {
+    fun allTypedRoutesRoundTripThroughRouteParameters() {
         listOf(
             TypedRoute.MyGames,
             TypedRoute.Settings,
@@ -26,22 +27,22 @@ class RouteAdapterTest {
     }
 
     @Test
-    fun supportsLegacyAliasesAndSafeFallbacks() {
+    fun supportsTypedRoutesAndSafeFallbacks() {
         assertEquals(
             TypedRoute.MyGamesDetail(F95ThreadId("123")),
-            RouteAdapter.decode(mapOf(routePage to Pages.MY_GAMES, routeThreadId to "123"))
+            RouteAdapter.decode(RouteParameters(mapOf(routePage to Pages.MY_GAMES, routeThreadId to "123")))
         )
         assertEquals(
             TypedRoute.MyGames,
-            RouteAdapter.decode(mapOf(routePage to Pages.MY_GAMES_DETAIL))
+            RouteAdapter.decode(RouteParameters(mapOf(routePage to Pages.MY_GAMES_DETAIL)))
         )
         assertEquals(
             TypedRoute.LatestUpdates(),
-            RouteAdapter.decode(mapOf(routePage to Pages.LATEST_UPDATES_DETAIL))
+            RouteAdapter.decode(RouteParameters(mapOf(routePage to Pages.LATEST_UPDATES_DETAIL)))
         )
         assertEquals(
             TypedRoute.MyGames,
-            RouteAdapter.decode(mapOf(routePage to "unknown", routeFilterId to "ignored"))
+            RouteAdapter.decode(RouteParameters(mapOf(routePage to "unknown", routeFilterId to "ignored")))
         )
     }
 }

@@ -46,4 +46,32 @@ class BuildConventionsTest {
             }
         }
     }
+
+    @Test
+    fun rawShutdownStateMachineIsOnlyUsedInsideItsKernelOwner() {
+        val sourceFiles = Files.walk(sourceRoot.resolve("jvmMain/kotlin")).use { stream ->
+            stream.filter { it.toString().endsWith(".kt") }.toList()
+        }
+        sourceFiles.filterNot { it.toString().contains("server\\kernel\\") }.forEach { sourceFile ->
+            val source = Files.readString(sourceFile)
+            assertFalse(
+                source.contains("ShutdownOperation"),
+                "Use ShutdownCoordinator instead of the raw shutdown state machine: $sourceFile"
+            )
+        }
+    }
+
+    @Test
+    fun lowLevelStateMutexIsOnlyUsedInsideTheKernel() {
+        val sourceFiles = Files.walk(sourceRoot.resolve("jvmMain/kotlin")).use { stream ->
+            stream.filter { it.toString().endsWith(".kt") }.toList()
+        }
+        sourceFiles.filterNot { it.toString().contains("server\\kernel\\") }.forEach { sourceFile ->
+            val source = Files.readString(sourceFile)
+            assertFalse(
+                source.contains("StateMutex"),
+                "Use a domain lock boundary instead of StateMutex directly: $sourceFile"
+            )
+        }
+    }
 }

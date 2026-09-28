@@ -1,122 +1,95 @@
 package f95gm.server.upstream.request
 
-import f95gm.server.config.Millis
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.config.logging.UpstreamRetryEvent
-import f95gm.server.config.logging.logger
-import f95gm.server.config.logging.structuredLog
-import f95gm.server.config.upstream.upstream
+import f95gm.server.config.constants.HttpStatusCatalog
+import f95gm.server.config.upstream.UpstreamBaseUrl
+import f95gm.server.observability.UpstreamRetryEvent
+import f95gm.server.observability.RetryAttempt
+import f95gm.server.observability.logger
+import f95gm.server.observability.structuredLog
 import f95gm.server.http.logging.redactLogValue
 import f95gm.server.http.request.RequestMetrics
-import f95gm.server.http.request.SafeHttpsUri
-import f95gm.server.http.request.SafeHttpsUriResult
-import f95gm.server.model.http.UpstreamFailure
 import f95gm.server.model.http.UpstreamRetryReason
-import f95gm.server.state.runtime.RetryDecision
-import f95gm.server.state.runtime.retrySuspending
+import f95gm.server.model.http.UpstreamFailure
+import f95gm.server.model.EpochMillis
+import f95gm.server.kernel.RetryDecision
+import f95gm.server.kernel.retrySuspending
+import f95gm.server.kernel.ServerClock
+import f95gm.domain.api.RetryJitter
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import java.io.IOException
-import java.net.URI
+import kotlin.time.Duration
 
 internal class UpstreamTransport(
     private val httpClient: UpstreamHttpClient,
-    private val policy: UpstreamPolicy,
-    private val retryPolicy: UpstreamRetryPolicy,
-    private val retryDelay: suspend (Long) -> Unit,
-    private val metrics: RequestMetrics
+    private val clock: ServerClock,
+    private val jitter: RetryJitter,
+    private val retryDelay: suspend (Duration) -> Unit,
+    private val metrics: RequestMetrics,
+    private val upstreamBaseUrl: UpstreamBaseUrl
 ) {
-    fun safeUri(path: String): String {
-        val base = URI(upstream)
-        if (path.startsWith("/")) return upstream.trimEnd('/') + path
-        if (base.scheme.equals("http", ignoreCase = true) && base.host.isLocalLoopback()) {
-            val candidate = runCatching { URI(path) }.getOrNull()
-            require(
-                candidate != null && candidate.scheme.equals("http", ignoreCase = true) &&
-                        candidate.host.equals(base.host, ignoreCase = true) && candidate.port == base.port &&
-                        candidate.userInfo == null && candidate.fragment == null
-            ) { "Upstream URI is not allowed in loopback fixture mode" }
-            return candidate.toString()
-        }
-        return when (val result = SafeHttpsUri.parseResult(path, setOf(base.host), setOf(-1, base.port, 443))) {
-            is SafeHttpsUriResult.Valid -> result.uri.toString()
-            is SafeHttpsUriResult.Invalid -> error("Upstream URI is not allowed: ${result.name}")
-        }
+    fun safeUri(path: UpstreamPath): UpstreamRequestUri {
+        return UpstreamRequestUri(UpstreamUrlPolicy.safeRequest(path, upstreamBaseUrl))
     }
 
     suspend fun requestWithRetry(
         method: HttpMethod,
-        uri: String,
+        uri: UpstreamRequestUri,
+        policy: UpstreamPolicy,
         block: HttpRequestBuilder.() -> Unit
     ): RetryOutcome {
         var lastRetryReason: UpstreamRetryReason? = null
-        return retrySuspending(policy.maxAttempts, pause = retryDelay) { attempt ->
+        val retryPolicy = UpstreamRetryPolicy(policy, jitter)
+        return retrySuspending(
+            policy.attemptLimit,
+            pause = retryDelay,
+            maxTotalDelay = policy.maxTotalRetryDelay.coerceAtMost(policy.requestTimeout)
+        ) { attempt ->
             try {
-                val response = httpClient.request(uri, block)
-                if (retryPolicy.shouldRetry(method, response.status, attempt)) {
-                    lastRetryReason = UpstreamRetryReason.HTTP_STATUS
+                val response = httpClient.request(UpstreamUri(uri.value), block)
+                val responseDecision = retryPolicy.responseDecision(
+                    method, response.status, response.headers, attempt, clock.epochMillis()
+                )
+                if (responseDecision is UpstreamRetryDecision.Retry) {
+                    lastRetryReason = responseDecision.reason
                     logger.warn {
                         structuredLog(
                             UpstreamRetryEvent(
                                 method.value,
-                                redactLogValue(uri.substringBefore('?')),
-                                attempt + 1
+                                redactLogValue(uri.value.substringBefore('?')),
+                                RetryAttempt(attempt + 1)
                             )
                         )
                     }
                     metrics.recordRetry()
-                    response.bodyAsChannel().cancel(null)
-                    RetryDecision.Again(
-                        Millis(
-                            retryPolicy.httpDelay(
-                                response.headers,
-                                attempt
-                            ).inWholeMilliseconds
-                        )
-                    )
+                    response.releaseUnconsumedBody()
+                    RetryDecision.Again(responseDecision.delay)
                 } else {
                     RetryDecision.Return(RetryOutcome.Response(response, attempt + 1, lastRetryReason))
                 }
             } catch (error: IOException) {
-                if (method != HttpMethod.Get || attempt == policy.maxAttempts - 1) {
+                val transportDecision = retryPolicy.transportDecision(method, attempt)
+                if (transportDecision == null) {
                     return@retrySuspending RetryDecision.Return(
                         RetryOutcome.Failure(
-                            UpstreamFailure.TRANSPORT,
+                            UpstreamFailure.CONNECTION_FAILURE,
                             attempt + 1,
                             lastRetryReason ?: UpstreamRetryReason.IO_EXCEPTION
                         )
                     )
                 }
-                lastRetryReason = UpstreamRetryReason.IO_EXCEPTION
+                val decision = transportDecision as UpstreamRetryDecision.Retry
+                lastRetryReason = decision.reason
                 metrics.recordRetry()
-                RetryDecision.Again(Millis(retryPolicy.ioDelay(attempt).inWholeMilliseconds))
+                RetryDecision.Again(decision.delay)
             }
         }
     }
 }
 
-private fun String?.isLocalLoopback(): Boolean = this?.lowercase() in setOf("localhost", "127.0.0.1", "::1", "[::1]")
-
-internal sealed interface RetryOutcome {
-    val attempts: Int
-    val reason: UpstreamRetryReason?
-
-    data class Response(
-        val response: HttpResponse,
-        override val attempts: Int,
-        override val reason: UpstreamRetryReason?
-    ) : RetryOutcome
-
-    data class Failure(
-        val failure: UpstreamFailure,
-        override val attempts: Int,
-        override val reason: UpstreamRetryReason?
-    ) : RetryOutcome
-}
-
 internal val retryableStatuses = setOf(
-    ServerConstants.STATUS_BAD_GATEWAY,
-    ServerConstants.STATUS_SERVICE_UNAVAILABLE,
-    ServerConstants.STATUS_GATEWAY_TIMEOUT
+    HttpStatusCatalog.BAD_GATEWAY,
+    HttpStatusCatalog.SERVICE_UNAVAILABLE,
+    HttpStatusCatalog.GATEWAY_TIMEOUT
 )

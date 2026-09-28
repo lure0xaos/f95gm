@@ -1,35 +1,37 @@
 package f95gm.server.app
 
-import f95gm.domain.api.F95Api
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.desktop.DesktopController
+import f95gm.domain.api.F95ApiPaths
+import f95gm.server.config.constants.HttpStatusCatalog
 import f95gm.server.desktop.ServerShutdownController
 import f95gm.server.http.response.respondJson
-import f95gm.server.state.runtime.ServerContext
+import f95gm.server.http.request.RequestMetrics
+import f95gm.server.http.request.toHttpResponse
+import f95gm.server.cache.CacheStatisticsProvider
+import f95gm.server.http.response.appendNoStore
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
 internal fun Route.configureHealthRoute(
     shutdownController: () -> ServerShutdownController,
-    desktop: () -> DesktopController?,
-    context: ServerContext
+    requestMetrics: RequestMetrics,
+    cacheStatisticsProvider: CacheStatisticsProvider,
+    healthState: ServerHealthState
 ) {
     fun Route.live(path: String) = get(path) {
-        desktop()?.updateTheme(call.request.queryParameters[F95Api.THEME])
-        shutdownController().browserHeartbeat(call.request.queryParameters[F95Api.TAB_ID])
-        call.response.headers.append(HttpHeaders.CacheControl, "no-store")
-        call.respond(ServerConstants.STATUS_OK)
+        call.appendNoStore()
+        if (healthState.isLive()) call.respond(HttpStatusCatalog.OK)
+        else call.respond(HttpStatusCode.ServiceUnavailable)
     }
-    live(F95Api.HEALTH)
-    live(F95Api.LIVE)
-    get(F95Api.READY) {
-        call.response.headers.append(HttpHeaders.CacheControl, "no-store")
-        if (shutdownController().isDraining) call.respond(HttpStatusCode.ServiceUnavailable)
-        else call.respond(ServerConstants.STATUS_OK)
+    live(F95ApiPaths.HEALTH)
+    live(F95ApiPaths.LIVE)
+    get(F95ApiPaths.READY) {
+        call.appendNoStore()
+        if (!healthState.isReady() || shutdownController().isDraining) call.respond(HttpStatusCode.ServiceUnavailable)
+        else call.respond(HttpStatusCatalog.OK)
     }
-    get(F95Api.METRICS) {
-        call.response.headers.append(HttpHeaders.CacheControl, "no-store")
-        respondJson(call, ServerConstants.STATUS_OK, context.requestMetrics.snapshot())
+    get(F95ApiPaths.METRICS) {
+        call.appendNoStore()
+        respondJson(call, HttpStatusCatalog.OK, requestMetrics.snapshot(cacheStatisticsProvider).toHttpResponse())
     }
 }

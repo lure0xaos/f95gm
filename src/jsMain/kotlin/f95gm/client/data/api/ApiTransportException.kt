@@ -1,4 +1,6 @@
 package f95gm.client.data.api
 
-internal class ApiTransportException(path: String, cause: Throwable) :
+import f95gm.domain.api.ApiPath
+
+internal class ApiTransportException(path: ApiPath, cause: Throwable) :
     RuntimeException("Transport request failed for $path", cause)

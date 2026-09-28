@@ -1,20 +1,32 @@
 package f95gm.server.http.request.origin
 
-import f95gm.server.state.runtime.ServerClock
-import f95gm.server.state.runtime.SystemServerClock
-import f95gm.server.state.runtime.cache.BoundedTtlCache
+import f95gm.server.kernel.ServerClock
+import f95gm.server.platform.SystemServerClock
+import f95gm.server.model.EpochMillis
+import f95gm.server.cache.CacheFactory
+import f95gm.server.cache.CachePolicy
+import f95gm.server.kernel.EntryCapacity
+import f95gm.server.cache.CacheNamespaces
+import f95gm.server.cache.CachePolicies
+import f95gm.server.kernel.CloseGuard
+import f95gm.server.kernel.LifecycleResource
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 
 internal class OriginValidationCache(
-    maxEntries: Int = 256,
-    ttl: Duration = 5.minutes,
+    maxEntries: Int = CachePolicies.ORIGIN.maxEntries,
+    ttl: Duration = CachePolicies.ORIGIN.ttl,
     private val clock: ServerClock = SystemServerClock
-) : AutoCloseable {
-    private val values = BoundedTtlCache.withTtl<String, Boolean>(maxEntries, ttl, clock)
+) : LifecycleResource {
+    private val closeGuard = CloseGuard()
+    private val values = CacheFactory.create<String, Boolean>(
+        CachePolicy.withCapacity(EntryCapacity(maxEntries), ttl),
+        clock,
+        namespaceOf = { CacheNamespaces.ORIGIN }
+    )
 
-    fun getOrPut(key: String, nowMillis: Long = clock.nowMillis(), compute: () -> Boolean): Boolean =
-        values.getOrPutAt(key, nowMillis, compute)
+    fun getOrPut(key: String, now: EpochMillis = clock.epochMillis(), compute: () -> Boolean): Boolean =
+        values.getOrPutAt(key, now.value, compute)
 
-    override fun close() = values.clear()
+    override val isClosed: Boolean get() = closeGuard.isClosed
+    override fun close() = closeGuard.closeOnce { values.clear() }
 }

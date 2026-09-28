@@ -1,9 +1,15 @@
 package f95gm.server.state.runtime
 
-internal class ServerLifecycleCloseException(failures: List<Exception>) :
-    IllegalStateException("Failed to close ${failures.size} server resource(s)") {
-    init {
-        failures.drop(1).forEach(::addSuppressed)
-        failures.firstOrNull()?.let(::initCause)
+import f95gm.server.kernel.ServerInvariantViolation
+
+internal class ServerLifecycleCloseException(summary: CleanupFailureSummary) :
+    ServerInvariantViolation(
+        "Failed to close ${summary.count} server resource(s): ${summary.resources.joinToString { it.value }} " +
+            "(${summary.failures.joinToString { it.category.name }})",
+        summary.primary
+    ) {
+        val failures: List<CleanupFailure> = summary.failures
+        init {
+            summary.addRemainingAsSuppressed(this)
+        }
     }
-}

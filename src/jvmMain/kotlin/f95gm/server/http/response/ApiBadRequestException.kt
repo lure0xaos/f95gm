@@ -7,5 +7,5 @@ import io.ktor.http.*
 internal class ApiBadRequestException(
     message: String,
     messageKey: F95ApiMessageKey? = null,
-    details: Map<String, String> = emptyMap()
-) : ApiApplicationException(HttpStatusCode.BadRequest, message, F95ApiErrorCode.INVALID_INPUT, messageKey, details)
+    details: ApiFailureDetails = ApiFailureDetails.EMPTY
+) : ApiApplicationException(HttpStatusCode.BadRequest, message, F95ApiErrorCode.INVALID_INPUT, messageKey, details, ApiFailureKind.Validation)

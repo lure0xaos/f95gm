@@ -1,6 +1,5 @@
 package f95gm.server.persistence.filters.alias
 
-import f95gm.server.config.constants.ServerConstants
 import java.text.Normalizer
 
 internal fun filterAlias(name: String): String {
@@ -30,7 +29,7 @@ internal fun filterAlias(name: String): String {
                 // Unmapped letters are omitted so the result remains Latin-only.
             }
         }
-    }.take(ServerConstants.FILTER_ID_LENGTH).trim('-')
+    }.take(f95gm.server.config.constants.FilterLimits.FILTER_ID_LENGTH).trim('-')
 
     return alias.ifBlank { FILTER_ALIAS_FALLBACK }
 }

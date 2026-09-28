@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import f95gm.server.upstream.parser.shared.HtmlBaseUrl
 
 class ParseDetailBodyTest {
     @Test
@@ -14,7 +15,8 @@ class ParseDetailBodyTest {
                 <b>developer:</b><p>Jane</p>
                 <b>Unknown:</b><p>Still developer content</p>
                 <b>VERSION:</b><p>1.2</p>
-            """.trimIndent()
+            """.trimIndent(),
+            HtmlBaseUrl("https://f95zone.to")
         )
 
         assertTrue(parsed.overview.contains("Overview text"))
@@ -29,7 +31,8 @@ class ParseDetailBodyTest {
         val parsed = parseDetailBody(
             """
                 <p>Intro</p><b>Developer:</b><br><b>Language:</b><p>English</p>
-            """.trimIndent()
+            """.trimIndent(),
+            HtmlBaseUrl("https://f95zone.to")
         )
 
         assertTrue(parsed.overview.contains("Intro"))

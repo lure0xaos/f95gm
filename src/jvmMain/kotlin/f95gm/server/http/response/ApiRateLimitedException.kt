@@ -5,10 +5,11 @@ import io.ktor.http.*
 
 internal class ApiRateLimitedException(
     message: String = "Too many requests",
-    details: Map<String, String> = emptyMap()
+    details: ApiFailureDetails = ApiFailureDetails.EMPTY
 ) : ApiApplicationException(
     HttpStatusCode.TooManyRequests,
     message,
     F95ApiErrorCode.RATE_LIMITED,
-    details = details
+    details = details,
+    kind = ApiFailureKind.RateLimit
 )

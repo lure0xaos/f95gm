@@ -2,6 +2,8 @@ package f95gm.server.upstream.request
 
 import f95gm.domain.values.F95AccountKey
 import f95gm.domain.values.F95SessionId
+import f95gm.server.config.upstream.UpstreamEndpointConfig
+import f95gm.server.config.Bytes
 import f95gm.server.model.auth.UpstreamSession
 import f95gm.server.model.http.UpstreamResponse
 import io.ktor.client.*
@@ -15,6 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class UpstreamClientTest {
     @Test
@@ -28,11 +31,12 @@ class UpstreamClientTest {
             UpstreamClient(
                 KtorUpstreamHttpClient(client),
                 scope = testScope(),
+                endpointConfig = UpstreamEndpointConfig.DEFAULT,
                 persistSession = { persisted = it }
             ).request(HttpMethod.Get, "/", session)
         }
         assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("session-value", session.cookieEntries()["xf_session"])
+        assertEquals("session-value", session.typedCookieEntries().entries.single { it.key.value == "xf_session" }.value.value)
         assertNotNull(persisted)
         client.close()
     }
@@ -46,7 +50,7 @@ class UpstreamClientTest {
             else respond("ok", HttpStatusCode.OK)
         })
         val response =
-            UpstreamClient(KtorUpstreamHttpClient(client), scope = testScope()).request(HttpMethod.Get, "/", session())
+            UpstreamClient(KtorUpstreamHttpClient(client), scope = testScope(), endpointConfig = UpstreamEndpointConfig.DEFAULT).request(HttpMethod.Get, "/", session())
         assertEquals(HttpStatusCode.OK, response.status)
         assertEquals(2, requests)
         client.close()
@@ -63,7 +67,7 @@ class UpstreamClientTest {
             active.decrementAndGet()
             respond("ok", HttpStatusCode.OK)
         })
-        val upstreamClient = UpstreamClient(KtorUpstreamHttpClient(client), scope = testScope())
+        val upstreamClient = UpstreamClient(KtorUpstreamHttpClient(client), scope = testScope(), endpointConfig = UpstreamEndpointConfig.DEFAULT)
         withContext(Dispatchers.Default) {
             coroutineScope {
                 listOf(
@@ -87,7 +91,7 @@ class UpstreamClientTest {
             active.decrementAndGet()
             respond("ok", HttpStatusCode.OK)
         })
-        val upstreamClient = UpstreamClient(KtorUpstreamHttpClient(client), scope = testScope())
+        val upstreamClient = UpstreamClient(KtorUpstreamHttpClient(client), scope = testScope(), endpointConfig = UpstreamEndpointConfig.DEFAULT)
         withContext(Dispatchers.Default) {
             coroutineScope {
                 listOf(
@@ -106,7 +110,8 @@ class UpstreamClientTest {
         val response = UpstreamClient(
             KtorUpstreamHttpClient(client),
             scope = testScope(),
-            policy = UpstreamPolicy(maxAttempts = 1, maxResponseBytes = 3)
+            endpointConfig = UpstreamEndpointConfig.DEFAULT,
+            policy = UpstreamPolicy(maxAttempts = 1, maxResponseBytes = Bytes(3))
         ).request(HttpMethod.Get, "/", session())
         assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
         client.close()
@@ -124,6 +129,7 @@ class UpstreamClientTest {
                 UpstreamClient(
                     KtorUpstreamHttpClient(client),
                     scope = testScope(),
+                    endpointConfig = UpstreamEndpointConfig.DEFAULT,
                     policy = UpstreamPolicy(maxAttempts = 1, requestTimeout = 10.milliseconds)
                 ).request(HttpMethod.Get, "/", session())
             }
@@ -133,7 +139,31 @@ class UpstreamClientTest {
         client.close()
     }
 
+    @Test
+    fun propagatesCancellationInsteadOfConvertingItToGatewayTimeout() = runTest {
+        val client = HttpClient(MockEngine {
+            awaitCancellation()
+        })
+        val upstreamClient = UpstreamClient(
+            KtorUpstreamHttpClient(client),
+            scope = this,
+            endpointConfig = UpstreamEndpointConfig.DEFAULT,
+            policy = UpstreamPolicy(maxAttempts = 1, requestTimeout = 30.seconds)
+        )
+        val request = launch {
+            upstreamClient.request(HttpMethod.Get, "/cancel", session())
+        }
+
+        request.cancelAndJoin()
+        assertTrue(request.isCancelled)
+        upstreamClient.close()
+        client.close()
+    }
+
     private fun session() = UpstreamSession(F95SessionId("session-id"), F95AccountKey("account"))
 
     private fun testScope() = CoroutineScope(Dispatchers.Default)
 }
+
+private suspend fun UpstreamClient.request(method: HttpMethod, path: String, session: UpstreamSession): UpstreamResponse =
+    request(UpstreamRequest(method, UpstreamPath(path), session))

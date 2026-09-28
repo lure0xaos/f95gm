@@ -1,12 +1,16 @@
 package f95gm.client.data.api
 
 import f95gm.domain.api.F95ApiErrorCode
+import f95gm.domain.api.ApiPath
+import f95gm.domain.api.F95ApiMessageKey
+import f95gm.client.model.runtime.HttpStatusCodeValue
 import kotlinx.coroutines.CancellationException
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
 class ApiExceptionTest {
@@ -14,11 +18,11 @@ class ApiExceptionTest {
     fun normalizesUnknownFailuresWithoutLosingTheirMessage() {
         val cause = IllegalStateException("database unavailable")
 
-        val normalized = normalizeApiException(cause, path = "/api/catalog", connectivityFailure = true)
+        val normalized = normalizeApiException(cause, path = ApiPath("/api/catalog"), causeKind = ApiExceptionCause.CONNECTIVITY)
 
-        assertEquals("/api/catalog", normalized.path)
+        assertEquals("/api/catalog", normalized.path.value)
         assertEquals("database unavailable", normalized.message)
-        assertEquals(true, normalized.connectivityFailure)
+        assertEquals(ApiExceptionCause.CONNECTIVITY, normalized.causeKind)
         assertSame(cause, normalized.cause)
         assertEquals(ApiFailureKind.CONNECTIVITY, normalized.kind)
     }
@@ -26,34 +30,34 @@ class ApiExceptionTest {
     @Test
     fun keepsExistingApiExceptionsAndClassifiesProtocolFailures() {
         val existing =
-            ApiException("/api/item", status = 401, message = "expired", messageKey = "server.sessionExpired")
+            ApiException(ApiPath("/api/item"), status = HttpStatusCodeValue(401), message = "expired", messageKey = F95ApiMessageKey("server.sessionExpired"))
         assertSame(existing, normalizeApiException(existing))
         assertEquals(ApiFailureKind.AUTHENTICATION, existing.kind)
 
         assertEquals(
             ApiFailureKind.RATE_LIMITED,
-            ApiException("/api/catalog", status = 429, message = "slow down", code = F95ApiErrorCode.RATE_LIMITED).kind
+            ApiException(ApiPath("/api/catalog"), status = HttpStatusCodeValue(429), message = "slow down", code = F95ApiErrorCode.RATE_LIMITED).kind
         )
         assertEquals(
             ApiFailureKind.VALIDATION,
-            ApiException("/api/filter", status = 400, message = "invalid", code = F95ApiErrorCode.INVALID_INPUT).kind
+            ApiException(ApiPath("/api/filter"), status = HttpStatusCodeValue(400), message = "invalid", code = F95ApiErrorCode.INVALID_INPUT).kind
         )
         assertEquals(
             ApiFailureKind.UPSTREAM,
-            ApiException("/api/item", status = 502, message = "upstream", code = F95ApiErrorCode.UPSTREAM_FAILURE).kind
+            ApiException(ApiPath("/api/item"), status = HttpStatusCodeValue(502), message = "upstream", code = F95ApiErrorCode.UPSTREAM_FAILURE).kind
         )
         assertEquals(
             ApiFailureKind.AUTHENTICATION,
             ApiException(
-                "/api/session",
-                status = 403,
+                ApiPath("/api/session"),
+                status = HttpStatusCodeValue(403),
                 message = "expired session",
-                messageKey = "server.sessionExpired"
+                messageKey = F95ApiMessageKey("server.sessionExpired")
             ).kind
         )
         assertEquals(
             ApiFailureKind.INTERNAL,
-            ApiException("/api/unknown", status = 500, message = "failed").kind
+            ApiException(ApiPath("/api/unknown"), status = HttpStatusCodeValue(500), message = "failed").kind
         )
     }
 
@@ -72,12 +76,14 @@ class ApiExceptionTest {
         assertEquals(0, failureCalls)
 
         val failure = runSuspend {
-            apiResult<String> { error("broken") }
+            apiResult<String> {
+                throw ApiException(ApiPath("/api/catalog"), status = HttpStatusCodeValue(500), message = "broken")
+            }
                 .onSuccess { successCalls++ }
                 .onFailure { failureCalls++ }
         }
 
-        assertEquals(ApiFailureKind.INTERNAL, (failure as ApiResult.Failure).error.kind)
+        assertEquals(ApiFailureKind.INTERNAL, (failure as ApiResult.Failure).failure.exception.kind)
         assertEquals(1, successCalls)
         assertEquals(1, failureCalls)
     }
@@ -100,6 +106,6 @@ class ApiExceptionTest {
                 completion = result
             }
         })
-        return completion!!.getOrThrow()
+        return assertNotNull(completion).getOrThrow()
     }
 }

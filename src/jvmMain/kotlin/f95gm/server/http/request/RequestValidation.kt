@@ -2,8 +2,19 @@ package f95gm.server.http.request
 
 import f95gm.domain.api.F95ApiErrorCode
 import f95gm.server.http.response.ServerMessageKey
-import f95gm.server.http.response.ServerMessageKeys
-import f95gm.server.state.runtime.upstreamJson
+import f95gm.server.http.serialization.upstreamJson
+import kotlinx.serialization.SerializationException
+import f95gm.server.http.response.ApiRequestTooLargeException
+import io.ktor.server.application.ApplicationCall
+import f95gm.domain.api.parseNonNegativeLong
+
+/** Enforces the cheap pipeline boundary before any route attempts to receive the body. */
+internal object RequestBodyLimit {
+    fun enforceContentLength(call: ApplicationCall, maxBytes: Long) {
+        val length = call.request.headers[io.ktor.http.HttpHeaders.ContentLength]?.parseNonNegativeLong()
+        if (length != null && length > maxBytes) throw ApiRequestTooLargeException()
+    }
+}
 
 internal sealed interface RequestValidation<out T> {
     data class Valid<T>(val value: T) : RequestValidation<T>
@@ -25,11 +36,10 @@ internal sealed interface RequestValidation<out T> {
 }
 
 internal inline fun <reified T> decodeJson(body: String): RequestValidation<T> =
-    runCatching { RequestValidation.Valid(upstreamJson.decodeFromString<T>(body)) }
-        .getOrElse {
-            RequestValidation.Invalid(
-                F95ApiErrorCode.INVALID_INPUT,
-                "Invalid JSON request",
-                messageKey = ServerMessageKeys.INVALID_JSON_REQUEST
-            )
-        }
+    try { RequestValidation.Valid(upstreamJson.decodeFromString<T>(body)) }
+    catch (_: SerializationException) { invalidJsonRequest() }
+
+private fun invalidJsonRequest() = RequestValidation.Invalid(
+    F95ApiErrorCode.INVALID_INPUT, "Invalid JSON request", messageKey = ServerMessageKey.INVALID_JSON_REQUEST
+)
+

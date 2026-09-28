@@ -2,38 +2,36 @@ package f95gm.server.persistence.sessions
 
 import f95gm.domain.values.F95AccountKey
 import f95gm.domain.values.F95SessionId
-import f95gm.server.config.constants.ServerConstants
-import f95gm.server.config.logging.*
+import f95gm.server.config.constants.ServerStorageLimits
+import f95gm.server.observability.*
 import f95gm.server.config.session.sessionMaxAgeSeconds
 import f95gm.server.model.auth.UpstreamSession
-import f95gm.server.persistence.database.DatabaseExecutor
+import f95gm.server.persistence.database.TransactionBoundary
+import f95gm.server.observability.DatabaseOperation
+import f95gm.server.persistence.database.DatabaseEpochMillis
 import f95gm.server.persistence.schema.SessionCookiesTable
 import f95gm.server.persistence.schema.SessionsTable
-import f95gm.server.state.runtime.ServerClock
-import f95gm.server.state.runtime.session.SessionRegistry
+import f95gm.server.kernel.ServerClock
+import f95gm.server.session.SessionRegistryPort
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.selectAll
 
-internal suspend fun restoreSessions(database: DatabaseExecutor, registry: SessionRegistry, clock: ServerClock) {
-    val now = clock.nowMillis()
-    database.transactionSuspending {
+internal suspend fun restoreSessions(database: TransactionBoundary, registry: SessionRegistryPort, clock: ServerClock) {
+    val now = clock.epochMillis().value
+    database.transactionSuspending(DatabaseOperation.SESSIONS_RESTORE) {
         SessionsTable.selectAll().forEach { row ->
             val rawId = row[SessionsTable.id]
             val accountKey = row[SessionsTable.accountKey]
-            val updatedAt = row[SessionsTable.updatedAt]
-            val validIdentity = rawId.isValidStoredValue(ServerConstants.SESSION_ID_LENGTH) &&
-                    accountKey.isValidStoredValue(ServerConstants.ACCOUNT_KEY_LENGTH)
-            if (!validIdentity ||
-                updatedAt <= 0L ||
-                updatedAt > now ||
-                now - updatedAt > sessionMaxAgeSeconds * ServerConstants.MILLIS_PER_SECOND
-            ) {
+            val updatedAt = DatabaseEpochMillis(row[SessionsTable.updatedAt]).toDomain()
+            val validIdentity = rawId.isValidStoredValue(ServerStorageLimits.SESSION_ID_LENGTH) &&
+                    accountKey.isValidStoredValue(ServerStorageLimits.ACCOUNT_KEY_LENGTH)
+            if (invalidSessionTimestamp(updatedAt.value, now) || !validIdentity) {
                 logger.warn {
                     auditLog(
                         AuditEvent(
                             AuditEventName.SESSION_ROW_QUARANTINED,
-                            listOf(logField("reason", if (!validIdentity) "invalid_identity" else "expired_or_future"))
+                            listOf(logField(StructuredLogKeys.REASON, if (!validIdentity) "invalid_identity" else "expired_or_future"))
                         )
                     )
                 }
@@ -45,20 +43,18 @@ internal suspend fun restoreSessions(database: DatabaseExecutor, registry: Sessi
                     .mapNotNull { cookie ->
                         val name = cookie[SessionCookiesTable.name]
                         val value = cookie[SessionCookiesTable.value]
-                        if (name.isValidStoredValue(ServerConstants.COOKIE_NAME_LENGTH) &&
-                            value.isValidStoredValue(ServerConstants.COOKIE_VALUE_LENGTH) &&
-                            value.none { it == ';' || it == '\r' || it == '\n' || it.code < 0x20 }
-                        ) name to value else null
+                        if (isSafeCookie(name, value)) name to value else null
                     }
-                    .take(ServerConstants.MAX_UPSTREAM_COOKIE_COUNT)
+                    .take(ServerStorageLimits.MAX_UPSTREAM_COOKIE_COUNT)
                     .associate { it }
                 val id = F95SessionId(rawId)
                 registry.put(
-                    id, UpstreamSession(
+                    id, UpstreamSession.fromPersistedCookies(
                         browserId = id,
                         accountKey = F95AccountKey(accountKey),
                         cookies = cookies
-                    )
+                    ),
+                    clock.monotonicMillisTimestamp()
                 )
             }
         }
@@ -67,3 +63,11 @@ internal suspend fun restoreSessions(database: DatabaseExecutor, registry: Sessi
 
 private fun String.isValidStoredValue(maxLength: Int): Boolean =
     isNotBlank() && length <= maxLength && none { it == '\u0000' }
+
+private fun invalidSessionTimestamp(storedTimestamp: Long, now: Long): Boolean =
+    storedTimestamp <= 0L || storedTimestamp > now || now - storedTimestamp > sessionMaxAgeSeconds * 1000L
+
+private fun isSafeCookie(name: String, value: String): Boolean =
+    name.isValidStoredValue(ServerStorageLimits.COOKIE_NAME_LENGTH) &&
+        value.isValidStoredValue(ServerStorageLimits.COOKIE_VALUE_LENGTH) &&
+        value.none { it == ';' || it == '\r' || it == '\n' || it.code < 0x20 }

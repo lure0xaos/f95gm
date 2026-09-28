@@ -1,5 +1,6 @@
 package f95gm.server.persistence
 
+import f95gm.server.persistence.model.requireStorageLength
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

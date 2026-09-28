@@ -1,6 +1,10 @@
 package f95gm.client.data.api
 
 import f95gm.domain.api.F95ApiErrorCode
+import f95gm.domain.api.ApiErrorDetailsContract
+import f95gm.domain.api.ApiPath
+import f95gm.domain.api.F95ApiMessageKey
+import f95gm.client.model.runtime.HttpStatusCodeValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -9,22 +13,22 @@ class ApiUserMessageTest {
     fun mapsKnownServerMessageKeysToLocalizedUserText() {
         assertEquals(
             "Sign in is required.",
-            ApiException("/api/catalog", message = "ignored", messageKey = "server.authenticationRequired")
+            ApiException(ApiPath("/api/catalog"), message = "ignored", messageKey = F95ApiMessageKey("server.authenticationRequired"))
                 .apiUserMessage("fallback")
         )
         assertEquals(
             "F95zone login failed (401).",
-            ApiException("/api/login", status = 401, message = "ignored", messageKey = "server.loginFailed")
+            ApiException(ApiPath("/api/login"), status = HttpStatusCodeValue(401), message = "ignored", messageKey = F95ApiMessageKey("server.loginFailed"))
                 .apiUserMessage("fallback")
         )
         assertEquals(
             "F95zone media returned 415.",
             ApiException(
-                "/api/media",
-                status = 502,
+                ApiPath("/api/media"),
+                status = HttpStatusCodeValue(502),
                 message = "ignored",
-                messageKey = "server.mediaStatus",
-                details = mapOf("status" to "415")
+                messageKey = F95ApiMessageKey("server.mediaStatus"),
+                details = ApiErrorDetailsContract(status = 415)
             ).apiUserMessage("fallback")
         )
     }
@@ -33,7 +37,7 @@ class ApiUserMessageTest {
     fun fallsBackToApiMessageThenThrowableMessage() {
         assertEquals(
             "server failed",
-            ApiException("/api/item", message = "server failed").apiUserMessage("fallback")
+            ApiException(ApiPath("/api/item"), message = "server failed").apiUserMessage("fallback")
         )
         assertEquals("fallback", IllegalStateException().apiUserMessage("fallback"))
         assertEquals(
@@ -43,10 +47,11 @@ class ApiUserMessageTest {
         assertEquals(
             ApiFailureKind.UPSTREAM,
             ApiException(
-                "/api/item",
+                ApiPath("/api/item"),
                 message = "upstream",
                 code = F95ApiErrorCode.UPSTREAM_FAILURE
             ).apiFailureKind()
         )
     }
 }
+

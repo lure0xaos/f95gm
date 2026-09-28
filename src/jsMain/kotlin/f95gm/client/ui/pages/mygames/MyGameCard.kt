@@ -3,13 +3,11 @@ package f95gm.client.ui.pages.mygames
 import dev.fritz2.core.RenderContext
 import dev.fritz2.core.title
 import dev.fritz2.core.type
-import f95gm.client.actions.marks.mutations.saveMarkedTrackingState
-import f95gm.client.actions.marks.mutations.unmarkGame
 import f95gm.client.model.catalog.DropdownChoice
 import f95gm.client.model.marks.MarkedGame
 import f95gm.client.routing.navigation.myGamesDetailRoute
 import f95gm.client.routing.navigation.router
-import f95gm.client.state.catalog.catalogOptions
+import f95gm.client.state.runtime.ClientMarksUiPort
 import f95gm.client.state.options.localizedTrackingState
 import f95gm.client.state.options.trackingStateOptions
 import f95gm.client.ui.shared.cards.GameCardData
@@ -24,13 +22,14 @@ import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.myGameCard(mark: MarkedGame) {
+internal fun RenderContext.myGameCard(runtime: ClientMarksUiPort, mark: MarkedGame) {
     div("game-column col d-flex") {
         div("game-card card h-100 w-100 d-flex flex-column shadow-sm overflow-hidden") {
             a("game-link text-decoration-none text-reset flex-grow-1") {
                 clicks.map { myGamesDetailRoute(mark.threadId) } handledBy router.navTo
-                catalogOptions.data.render { options ->
+                runtime.catalogOptionsView.data.render { options ->
                     gameCardContent(
+                        runtime = runtime,
                         card = GameCardData(
                             mark.title.value,
                             mark.developer.value,
@@ -52,6 +51,7 @@ internal fun RenderContext.myGameCard(mark: MarkedGame) {
             }
             div("game-actions card-footer d-flex align-items-center gap-2") {
                 bootstrapDropdown(
+                    runtime = runtime,
                     selected = flowOf(mark.trackingState.wireValue),
                     selectedLabel = flowOf(
                         trackingStateOptions.firstOrNull { it.first.wireValue == mark.trackingState.wireValue }?.second
@@ -65,16 +65,15 @@ internal fun RenderContext.myGameCard(mark: MarkedGame) {
                     } + DropdownChoice("", UiMessages.app_unmark())),
                     buttonClass = "$secondaryNavigationButtonClass text-start flex-grow-1"
                 ) { selected ->
-                    if (selected.isBlank()) unmarkGame(mark.threadId)
-                    else GameTrackingState.fromWire(selected)?.let { saveMarkedTrackingState(mark, it) }
+                    if (selected.isBlank()) runtime.marksCommands.unmarkGame(mark.threadId)
+                    else GameTrackingState.fromWire(selected)?.let { runtime.marksCommands.saveMarkedTrackingState(mark, it) }
                 }
                 if (mark.updateAvailable) {
                     button(primaryNavigationButtonClass) {
                         type("button")
                         +UiMessages.app_downloaded(mark.latestVersion.value)
                         clicks handledBy {
-                            saveMarkedTrackingState(
-                                mark,
+                            runtime.marksCommands.saveMarkedTrackingState(mark,
                                 GameTrackingState.DOWNLOADED,
                                 acknowledge = true
                             )
@@ -86,7 +85,7 @@ internal fun RenderContext.myGameCard(mark: MarkedGame) {
                     span("bi bi-trash") {}
                     attr("aria-label", UiMessages.app_remove())
                     title(UiMessages.app_remove())
-                    clicks handledBy { unmarkGame(mark.threadId) }
+                    clicks handledBy { runtime.marksCommands.unmarkGame(mark.threadId) }
                 }
             }
         }

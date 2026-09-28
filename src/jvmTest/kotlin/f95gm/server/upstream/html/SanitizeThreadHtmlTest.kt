@@ -1,10 +1,12 @@
 package f95gm.server.upstream.html
 
+import f95gm.server.config.upstream.UpstreamBaseUrl
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SanitizeThreadHtmlTest {
+    private val baseUrl = UpstreamBaseUrl.parse("https://f95zone.to")
     @Test
     fun removesExecutableElementsAttributesAndUnsafeStyles() {
         val sanitized = sanitizeThreadHtml(
@@ -12,7 +14,8 @@ class SanitizeThreadHtmlTest {
                 <p onclick="alert(1)" style="background:url(https://evil.example/x)">Text</p>
                 <script>alert(1)</script><iframe src="https://evil.example/frame"></iframe>
                 <a href="javascript:alert(1)">Unsafe</a><img src="data:image/png;base64,abc">
-            """.trimIndent()
+            """.trimIndent(),
+            baseUrl
         ).value
 
         assertTrue(sanitized.contains("Text"))
@@ -31,7 +34,8 @@ class SanitizeThreadHtmlTest {
                 <a href="//attachments.f95zone.to/files/game.jpg">
                     <img data-src="//attachments.f95zone.to/files/game.jpg" alt="Game">
                 </a>
-            """.trimIndent()
+            """.trimIndent(),
+            baseUrl
         ).value
 
         assertTrue(sanitized.contains("href=\"/api/media?url=https%3A%2F%2Fattachments.f95zone.to%2Ffiles%2Fgame.jpg\""))

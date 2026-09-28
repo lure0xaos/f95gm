@@ -5,36 +5,37 @@ import dev.fritz2.core.addGlobalStyles
 import dev.fritz2.core.render
 import dev.fritz2.core.type
 import f95gm.client.actions.auth.restoreSession
-import f95gm.client.actions.runtime.retryJvmConnection
-import f95gm.client.actions.runtime.startJvmConnectionMonitor
+import f95gm.client.actions.connection.retryJvmConnection
+import f95gm.client.actions.connection.startJvmConnectionMonitor
 import f95gm.client.model.feedback.ToastState
 import f95gm.client.routing.navigation.router
-import f95gm.client.state.feedback.toast
 import f95gm.client.state.runtime.*
-import f95gm.client.state.session.session
-import f95gm.client.state.settings.appSettings
+import f95gm.domain.api.F95ApiPaths
+import f95gm.domain.api.ApiBrowserTabId
 import f95gm.client.ui.detail.gallery.detailGallery
 import f95gm.client.ui.pages.auth.loginPage
 import f95gm.client.ui.pages.auth.sessionCheckingPage
 import f95gm.client.ui.pages.authenticatedPage
 import f95gm.client.ui.styles.applicationStyles
-import f95gm.domain.api.F95Api
 import f95gm.messages.UiMessages
-import kotlinx.browser.document
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
-internal fun startClient() {
-    startClientScope()
+internal fun startClient(state: ClientState) {
+    val runtime = ClientComposition.create(state)
+    val appSettings = state.shell.appSettings
+    val session = state.shell.session
+    val toast = state.shell.toast
+    val jvmConnection = state.shell.jvmConnection
+    runtime.start()
     loadBootstrapAssets()
     addGlobalStyles(applicationStyles)
-    startJvmConnectionMonitor()
-    document.title = UiMessages.app_pageTitle()
+    startJvmConnectionMonitor(runtime)
+    state.browser.setTitle(UiMessages.app_pageTitle())
     render {
         Window.pagehides handledBy {
-            navigator.sendBeacon("${F95Api.SHUTDOWN}?${F95Api.TAB_ID}=${BrowserTabId.value}")
-            cancelClientScope()
+            state.browser.sendBeacon(F95ApiPaths.shutdownPath(ApiBrowserTabId(runtime.browserTabId.value)).value)
+            runtime.close()
         }
         div("app-shell bg-black min-vh-100") {
             attr("data-bs-theme", appSettings.data.map { it.theme.bootstrapValue })
@@ -48,16 +49,16 @@ internal fun startClient() {
                             button("btn btn-sm btn-outline-danger") {
                                 type("button")
                                 +UiMessages.app_retry()
-                                clicks handledBy { retryJvmConnection() }
+                                clicks handledBy { retryJvmConnection(runtime) }
                             }
                         }
                     }
                 }
                 div("view-root") {
-                    session.data.map { it.checking to it.authenticated }.distinctUntilChanged().render {
+                    session.data.map { it.async.isLoading to it.authenticated }.distinctUntilChanged().render {
                         if (it.first) sessionCheckingPage()
-                        else if (!it.second) loginPage()
-                        else router.data.render { route -> authenticatedPage(route) }
+                        else if (!it.second) loginPage(runtime)
+                        else router.data.render { route -> authenticatedPage(runtime, route) }
                     }
                 }
             }
@@ -80,8 +81,8 @@ internal fun startClient() {
                     }
                 }
             }
-            detailGallery()
+            detailGallery(runtime)
         }
     }
-    scope.launch { restoreSession() }
+    runtime.launchAuthenticationOperation { restoreSession(runtime) }
 }

@@ -3,36 +3,36 @@ package f95gm.client.ui.pages.mygames
 import dev.fritz2.core.RenderContext
 import dev.fritz2.core.disabled
 import dev.fritz2.core.type
-import f95gm.client.actions.catalog.loading.loadFilterOptionsIfNeeded
-import f95gm.client.actions.filters.loadSavedFiltersIfNeeded
 import f95gm.client.actions.marks.loading.MarkCheckNotification
-import f95gm.client.actions.marks.loading.checkMarkedGames
-import f95gm.client.actions.marks.loading.loadMarksIfNeeded
-import f95gm.client.actions.marks.loading.retryMarkedGames
 import f95gm.client.model.marks.markedGamesView
-import f95gm.client.state.marks.marks
-import f95gm.client.state.settings.appSettings
 import f95gm.client.ui.navigation.NavbarPage
 import f95gm.client.ui.navigation.responsiveNavbar
 import f95gm.client.ui.shared.loading.pageLoadingOverlay
 import f95gm.client.ui.shared.navigation.successOutlineNavigationButtonClass
+import f95gm.client.state.runtime.ClientMarksPagePort
+import f95gm.client.model.marks.error
+import f95gm.client.model.marks.loading
+import f95gm.client.model.marks.checking
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.myGamesPage() {
+internal fun RenderContext.myGamesPage(runtime: ClientMarksPagePort) {
+    val marks = runtime.marksView
+    val appSettings = runtime.appSettingsView
     div("marked-page") {
         responsiveNavbar(
+            runtime = runtime,
             navigationId = "marked-navigation",
             page = NavbarPage.TRACKED_GAMES,
-            toolbar = { myGamesToolbar() },
+            toolbar = { myGamesToolbar(runtime) },
             leadingAccountAction = {
                 button(successOutlineNavigationButtonClass) {
                     type("button")
                     span("bi bi-arrow-repeat me-1") {}
                     +UiMessages.app_checkForUpdates()
                     disabled(marks.data.map { it.checking })
-                    clicks handledBy { checkMarkedGames(MarkCheckNotification.SHOW_TOAST) }
+                    clicks handledBy { runtime.marksCommands.checkMarkedGames(MarkCheckNotification.SHOW_TOAST) }
                 }
             }
         )
@@ -56,13 +56,13 @@ internal fun RenderContext.myGamesPage() {
                         button("btn btn-sm btn-outline-danger") {
                             type("button")
                             +UiMessages.app_retry()
-                            clicks handledBy { retryMarkedGames() }
+                            clicks handledBy { runtime.marksCommands.retryMarkedGames() }
                         }
                     }
                 }
             }
         }
-        myGamesPagination()
+        myGamesPagination(runtime)
         div("feed w-100") {
             marks.data.map { state -> state.items.isEmpty() to markedGamesView(state).items }
                 .distinctUntilChanged()
@@ -82,7 +82,7 @@ internal fun RenderContext.myGamesPage() {
                                     }
                                 }
                             } else {
-                                items.forEach { myGameCard(it) }
+                                items.forEach { myGameCard(runtime, it) }
                             }
                         }
                     }
@@ -91,9 +91,9 @@ internal fun RenderContext.myGamesPage() {
                 if (loading) pageLoadingOverlay(UiMessages.app_loadingMarkedGames())
             }
         }
-        myGamesPagination()
+        myGamesPagination(runtime)
     }
-    loadMarksIfNeeded()
-    loadSavedFiltersIfNeeded()
-    loadFilterOptionsIfNeeded()
+    runtime.marksCommands.loadMarksIfNeeded()
+    runtime.filtersCommands.loadSavedFiltersIfNeeded()
+    runtime.catalogCommands.loadFilterOptionsIfNeeded()
 }

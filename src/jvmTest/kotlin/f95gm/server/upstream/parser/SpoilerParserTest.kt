@@ -5,10 +5,12 @@ import f95gm.domain.values.F95OptionName
 import f95gm.server.model.detail.DetailSection
 import f95gm.server.upstream.parser.spoiler.SpoilerContentMode
 import f95gm.server.upstream.parser.spoiler.splitSpoilerSections
-import f95gm.server.upstream.parser.spoiler.spoilerHeading
+import f95gm.server.upstream.parser.shared.spoilerHeading
+import f95gm.server.upstream.parser.shared.HtmlBaseUrl
 import org.jsoup.Jsoup
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -28,9 +30,9 @@ class SpoilerParserTest {
             "<b>DOWNLOAD:</b><div class='bbCodeSpoiler'><b>DOWNLOAD:</b></div><b>Unknown:</b>"
         )
 
-        assertEquals("DOWNLOAD", spoilerHeading(document.selectFirst("b")!!))
-        assertNull(spoilerHeading(document.select("div.bbCodeSpoiler b").first()!!))
-        assertNull(spoilerHeading(document.select("b").last()!!))
+        assertEquals("DOWNLOAD", spoilerHeading(assertNotNull(document.selectFirst("b"))))
+        assertNull(spoilerHeading(assertNotNull(document.select("div.bbCodeSpoiler b").first())))
+        assertNull(spoilerHeading(assertNotNull(document.select("b").last())))
     }
 
     @Test
@@ -46,7 +48,7 @@ class SpoilerParserTest {
             )
         )
 
-        val sections = splitSpoilerSections(section, SpoilerContentMode.KEEP_NON_SPOILER_CONTENT)
+        val sections = splitSpoilerSections(section, SpoilerContentMode.KEEP_NON_SPOILER_CONTENT, HtmlBaseUrl("https://f95zone.to"))
 
         assertEquals(listOf("DESCRIPTION", "IMPORTANT", "DOWNLOAD", "Images"), sections.map { it.title.value })
         assertTrue(sections[0].html.value.contains("Intro"))

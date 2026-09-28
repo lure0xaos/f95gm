@@ -2,6 +2,7 @@ package f95gm.server.model.marks
 
 import f95gm.domain.tracking.GameTrackingState
 import f95gm.domain.values.*
+import f95gm.server.model.EpochMillis
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -21,5 +22,5 @@ internal data class MarkResponse(
     val storedVersion: StoredVersion,
     val latestVersion: F95GameVersion,
     val updateAvailable: Boolean,
-    val updatedAt: Long
+    val updatedAt: EpochMillis
 )

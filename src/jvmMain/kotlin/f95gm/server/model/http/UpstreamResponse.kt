@@ -1,31 +1,44 @@
 package f95gm.server.model.http
 
-import f95gm.server.config.constants.ServerConstants
+import f95gm.server.config.constants.HttpStatusCatalog
 import io.ktor.http.*
+
+@JvmInline
+internal value class UpstreamLocation(val value: String) {
+    init { require(value.isNotBlank()) }
+}
+
+@JvmInline
+internal value class ResponseBodyBytes(val value: Long) {
+    init { require(value >= 0L) }
+}
 
 internal sealed interface UpstreamResponse {
     val status: HttpStatusCode
     val body: String
-    val contentType: String?
-    val location: String?
+    val bodyByteCount: ResponseBodyBytes
+    val contentType: ContentType?
+    val location: UpstreamLocation?
     val retryAttempts: Int
     val retryReason: UpstreamRetryReason?
 
     data class Success(
         override val status: HttpStatusCode,
         override val body: String,
-        override val contentType: String?,
-        override val location: String? = null,
+        override val contentType: ContentType?,
+        override val location: UpstreamLocation? = null,
         override val retryAttempts: Int = 1,
-        override val retryReason: UpstreamRetryReason? = null
+        override val retryReason: UpstreamRetryReason? = null,
+        override val bodyByteCount: ResponseBodyBytes = ResponseBodyBytes(body.encodeToByteArray().size.toLong())
     ) : UpstreamResponse
 
     data class Failure(
         override val status: HttpStatusCode,
         override val body: String,
-        override val contentType: String?,
-        override val location: String? = null,
-        val reason: UpstreamFailure
+        override val contentType: ContentType?,
+        override val location: UpstreamLocation? = null,
+        val reason: UpstreamFailure,
+        override val bodyByteCount: ResponseBodyBytes = ResponseBodyBytes(body.encodeToByteArray().size.toLong())
     ) : UpstreamResponse {
         override val retryAttempts: Int = 1
         override val retryReason: UpstreamRetryReason? = null
@@ -34,7 +47,7 @@ internal sealed interface UpstreamResponse {
 
 internal fun upstreamCircuitOpenResponse(): UpstreamResponse =
     UpstreamResponse.Failure(
-        status = ServerConstants.STATUS_SERVICE_UNAVAILABLE,
+        status = HttpStatusCatalog.SERVICE_UNAVAILABLE,
         body = "",
         contentType = null,
         reason = UpstreamFailure.CIRCUIT_OPEN
@@ -42,24 +55,11 @@ internal fun upstreamCircuitOpenResponse(): UpstreamResponse =
 
 internal fun upstreamResponseTooLargeResponse(): UpstreamResponse =
     UpstreamResponse.Failure(
-        status = ServerConstants.STATUS_PAYLOAD_TOO_LARGE,
+        status = HttpStatusCatalog.PAYLOAD_TOO_LARGE,
         body = "",
         contentType = null,
         reason = UpstreamFailure.RESPONSE_TOO_LARGE
     )
-
-internal enum class UpstreamFailure {
-    CIRCUIT_OPEN("The upstream service is temporarily unavailable"),
-    RESPONSE_TOO_LARGE("The upstream response was too large"),
-    TRANSPORT("The upstream service could not be reached"),
-    TIMEOUT("The upstream service timed out");
-
-    val userMessage: String
-
-    private constructor(userMessage: String) {
-        this.userMessage = userMessage
-    }
-}
 
 internal val UpstreamResponse.userFacingBody: String
     get() = when (this) {

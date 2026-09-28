@@ -4,6 +4,10 @@ import f95gm.messages.UiMessages
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import f95gm.client.data.api.PayloadParseException
+import f95gm.client.data.api.PayloadParseResult
+import f95gm.client.data.api.PayloadPolicies
+import f95gm.client.data.api.ParseFailureReason
 
 class ParseCatalogTest {
     @Test
@@ -65,10 +69,45 @@ class ParseCatalogTest {
 
     @Test
     fun rejectsNonSuccessfulCatalogPayloads() {
-        val error = assertFailsWith<IllegalStateException> {
+        val error = assertFailsWith<PayloadParseException> {
             parseCatalog("{\"status\":\"error\",\"msg\":\"failed\"}")
         }
 
-        assertEquals("failed", error.message)
+        assertEquals(ParseFailureReason.INVALID_ENVELOPE, error.reason)
+    }
+
+    @Test
+    fun reportsMalformedNestedCatalogDataAsAnInvalidPayload() {
+        val result = parseCatalogResult("""{"status":"ok","msg":"not-an-object"}""")
+
+        assertEquals(PayloadParseResult.Failure(ParseFailureReason.INVALID_PAYLOAD), result)
+    }
+
+    @Test
+    fun toleratesMissingAndUnexpectedNestedValues() {
+        val result = parseCatalog(
+            """{"status":"ok","msg":{"data":[{"thread_id":"9","tags":"wrong","images":[],"rating":"bad","unknown":{"x":1}}]}}"""
+        )
+
+        assertEquals("9", result.items.single().threadId.value)
+        assertEquals(emptyList(), result.items.single().tags)
+        assertEquals(0.0, result.items.single().rating)
+        assertEquals(1, result.totalPages)
+    }
+
+    @Test
+    fun reportsTypedEndpointForMalformedPayloads() {
+        val error = assertFailsWith<PayloadParseException> { parseCatalog("{") }
+
+        assertEquals("catalog", error.endpoint?.value)
+    }
+
+    @Test
+    fun rejectsLargeMalformedPayloadsWithoutLeakingAParserException() {
+        val payload = "{" + "x".repeat(PayloadPolicies.Catalog.maxChars + 1)
+
+        val error = assertFailsWith<PayloadParseException> { parseCatalog(payload) }
+
+        assertEquals("catalog", error.endpoint?.value)
     }
 }

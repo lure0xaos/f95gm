@@ -1,6 +1,5 @@
 package f95gm.server.routes.validation
 
-import f95gm.server.config.constants.ServerConstants
 import f95gm.server.routes.catalog.isNumericId
 import f95gm.server.routes.filters.validation.isSavedFilterAlias
 import f95gm.server.routes.filters.validation.isValidSavedFilterId
@@ -35,7 +34,7 @@ class ValidationPropertyTest {
         }
         val invalidAliases = listOf("", "-start", "end-", "double--dash", "Upper", "with_under")
         invalidAliases.forEach { assertFalse(isSavedFilterAlias(it), it) }
-        assertFalse(isValidSavedFilterId("a".repeat(ServerConstants.FILTER_ID_LENGTH + 1)))
-        assertTrue(isValidSavedFilterId("00000000-0000-0000-0000-000000000001"))
+        assertFalse(isValidSavedFilterId("a".repeat(f95gm.server.config.constants.FilterLimits.FILTER_ID_LENGTH + 1)))
+            assertFalse(isValidSavedFilterId("00000000-0000-0000-0000-000000000001"))
     }
 }

@@ -1,5 +1,7 @@
 package f95gm.server.state.runtime
 
+import f95gm.server.kernel.CloseGuard
+
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

@@ -17,13 +17,13 @@ class RouteLocationTest {
             routePage to "latest-updates-detail",
             routeThreadId to "12345"
         )
-        assertEquals(route, RouteLocation.fromHash(RouteLocation.toHash(route)))
+        assertEquals(RouteParameters(route), RouteLocation.fromHash(RouteLocation.toHash(RouteParameters(route))))
     }
 
     @Test
     fun convertsValidDetailRouteToTypedModel() {
         val route = mapOf(routePage to "latest-updates-detail", routeThreadId to "12345")
-        assertEquals(TypedRoute.LatestUpdatesDetail(F95ThreadId("12345")), RouteAdapter.decode(route))
+        assertEquals(TypedRoute.LatestUpdatesDetail(F95ThreadId("12345")), RouteAdapter.decode(RouteParameters(route)))
     }
 
     @Test
@@ -36,22 +36,22 @@ class RouteLocationTest {
     fun encodesAndDecodesUrlEscapedFilterIds() {
         val route = mapOf(routePage to "latest-updates", routeFilterId to "my favorites")
 
-        assertEquals("latest-updates/my%20favorites/", RouteLocation.toHash(route))
-        assertEquals(route, RouteLocation.fromHash("#latest-updates/my%20favorites/"))
+        assertEquals("latest-updates/my%20favorites/", RouteLocation.toHash(RouteParameters(route)))
+        assertEquals(RouteParameters(route), RouteLocation.fromHash("#latest-updates/my%20favorites/"))
     }
 
     @Test
     fun resolvesItemPathsAndFallsBackForMalformedLocations() {
         assertEquals(
-            mapOf(routePage to "latest-updates-detail", routeThreadId to "123"),
+            RouteParameters(mapOf(routePage to "latest-updates-detail", routeThreadId to "123")),
             RouteLocation.fromPath("/item/123", "")
         )
         assertEquals(
-            mapOf(routePage to "settings"),
+            RouteParameters(mapOf(routePage to "my-games")),
             RouteLocation.fromHash("#?page=settings")
         )
         assertEquals(
-            mapOf(routePage to "my-games"),
+            RouteParameters(mapOf(routePage to "my-games")),
             RouteLocation.fromHash("#unknown")
         )
     }

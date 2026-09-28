@@ -1,5 +1,8 @@
 package f95gm.server.upstream.parser
 
+import f95gm.server.upstream.parser.shared.extractNestedSections
+import f95gm.server.upstream.parser.shared.HtmlBaseUrl
+
 import org.jsoup.Jsoup
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,7 +13,7 @@ class ExtractSectionsTest {
     fun returnsNoSectionsWhenDownloadHeadingIsAbsent() {
         val body = Jsoup.parseBodyFragment("<p>Only description</p>").body()
 
-        assertEquals(emptyList(), extractNestedSections(body))
+        assertEquals(emptyList(), extractNestedSections(body, HtmlBaseUrl("https://f95zone.to")))
     }
 
     @Test
@@ -20,7 +23,7 @@ class ExtractSectionsTest {
                     "<p><img src='https://example.com/game.jpg'></p>"
         ).body()
 
-        val sections = extractNestedSections(body)
+        val sections = extractNestedSections(body, HtmlBaseUrl("https://f95zone.to"))
 
         assertEquals(listOf("DOWNLOAD", "Images"), sections.map { it.title.value })
         assertTrue(sections[0].html.value.contains("Mirror"))
@@ -35,7 +38,7 @@ class ExtractSectionsTest {
             "<b>DOWNLOAD:</b><p><span>Not an image</span></p><div></div>"
         ).body()
 
-        val sections = extractNestedSections(body)
+        val sections = extractNestedSections(body, HtmlBaseUrl("https://f95zone.to"))
 
         assertEquals(listOf("DOWNLOAD"), sections.map { it.title.value })
         assertTrue(sections.single().html.value.contains("Not an image"))

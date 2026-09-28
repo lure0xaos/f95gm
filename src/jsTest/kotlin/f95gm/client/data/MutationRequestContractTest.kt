@@ -1,7 +1,7 @@
 package f95gm.client.data
 
 import f95gm.domain.api.F95MarkRequest
-import f95gm.domain.api.F95SavedFilterRequest
+import f95gm.domain.api.SavedFilterRequest
 import f95gm.domain.tracking.GameTrackingState
 import f95gm.domain.values.F95EpochMillis
 import f95gm.domain.values.F95FilterId
@@ -28,14 +28,14 @@ class MutationRequestContractTest {
 
     @Test
     fun savedFilterRequestsRoundTripWithDefaultsAndExplicitFields() {
-        val request = F95SavedFilterRequest(
+        val request = SavedFilterRequest(
             id = F95FilterId("favorites"),
             name = F95OptionName("My games"),
             search = "demo",
             expectedUpdatedAt = F95EpochMillis(99)
         )
 
-        val decoded = Json.decodeFromString<F95SavedFilterRequest>(Json.encodeToString(request))
+        val decoded = Json.decodeFromString<SavedFilterRequest>(Json.encodeToString(request))
 
         assertEquals(request, decoded)
         assertEquals("favorites", decoded.id.value)

@@ -1,16 +1,15 @@
 package f95gm.server.persistence.schema
 
 import f95gm.domain.tracking.GameTrackingState
-import f95gm.server.config.constants.ServerConstants
 import org.jetbrains.exposed.v1.core.Table
 
 internal object MarksTable : Table("marks") {
-    val accountKey = varchar("account_key", ServerConstants.ACCOUNT_KEY_LENGTH)
-    val threadId = varchar("thread_id", ServerConstants.THREAD_ID_LENGTH)
+    val accountKey = varchar("account_key", f95gm.server.config.constants.ServerStorageLimits.ACCOUNT_KEY_LENGTH)
+    val threadId = varchar("thread_id", f95gm.server.config.constants.ServerStorageLimits.THREAD_ID_LENGTH)
     val trackingState =
-        enumerationByName("tracking_state", ServerConstants.ENUMERATION_LENGTH, GameTrackingState::class)
-    val storedVersion = varchar("stored_version", ServerConstants.STORED_VERSION_LENGTH)
-    val lastSeenUpdateVersion = varchar("last_seen_update_version", ServerConstants.STORED_VERSION_LENGTH).default("")
+        enumerationByName("tracking_state", f95gm.server.config.constants.FilterLimits.ENUMERATION_LENGTH, GameTrackingState::class)
+    val storedVersion = varchar("stored_version", f95gm.server.config.constants.ServerStorageLimits.STORED_VERSION_LENGTH)
+    val lastSeenUpdateVersion = varchar("last_seen_update_version", f95gm.server.config.constants.ServerStorageLimits.STORED_VERSION_LENGTH).default("")
     val updatedAt = long("updated_at")
 
     init {

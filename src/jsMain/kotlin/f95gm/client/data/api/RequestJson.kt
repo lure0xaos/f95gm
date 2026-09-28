@@ -1,38 +1,39 @@
 package f95gm.client.data.api
 
-import f95gm.client.state.runtime.http
-import f95gm.domain.api.F95HttpStatus
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
+import f95gm.domain.api.ApiResponseEnvelope
+import f95gm.domain.api.ApiPath
+import f95gm.client.model.runtime.HttpStatusCodeValue
+import f95gm.client.model.runtime.ApiEndpointId
 import io.ktor.http.*
 
 internal suspend fun requestJson(
-    path: String,
+    path: ApiPath,
     method: HttpMethod,
-    body: String? = null,
-    fallback: (status: Int) -> String,
-    transport: ApiTransport = ApiTransport(http)
-): String {
-    val response = apiRequest(path, transport = transport, request = { apiTransport ->
-        apiTransport.request(path) {
-            this.method = method
-            if (body != null) {
-                contentType(ContentType.Application.Json)
-                setBody(body)
-            }
-        }
-    })
-    val responseBody = response.bodyAsText()
-    if (response.status.value !in F95HttpStatus.SUCCESS_MIN..F95HttpStatus.SUCCESS_MAX) {
-        val apiError = parseApiError(responseBody, fallback(response.status.value))
-        throw ApiException(
-            path = path,
-            status = response.status.value,
-            message = apiError.message,
-            code = apiError.code,
-            messageKey = apiError.messageKey,
-            details = apiError.details
-        )
-    }
-    return responseBody
+    body: ApiRequestBody? = null,
+    contentType: ApiContentType? = null,
+    headers: ApiHeaders = ApiHeaders.EMPTY,
+    fallback: ApiStatusFallback,
+    endpoint: ApiEndpointId = ApiEndpointId(path.value),
+    transport: ApiTransport,
+    events: ApiClientEvents,
+    executor: ApiRequestExecutor? = null,
+    retryPolicy: RetryPolicy = RetryPolicy()
+): String = requestJsonEnvelope(path, method, body, contentType, headers, fallback, endpoint, transport, events, executor, retryPolicy).body
+
+internal suspend fun requestJsonEnvelope(
+    path: ApiPath,
+    method: HttpMethod,
+    body: ApiRequestBody? = null,
+    contentType: ApiContentType? = null,
+    headers: ApiHeaders = ApiHeaders.EMPTY,
+    fallback: ApiStatusFallback,
+    endpoint: ApiEndpointId = ApiEndpointId(path.value),
+    transport: ApiTransport,
+    events: ApiClientEvents,
+    executor: ApiRequestExecutor? = null,
+    retryPolicy: RetryPolicy = RetryPolicy()
+): ApiResponseEnvelope<String> {
+    return (executor ?: ApiRequestExecutor(transport, events)).execute(
+        ApiRequestContext(path = path, endpoint = endpoint, method = method, body = body, contentType = contentType, headers = headers, fallback = fallback, retryPolicy = retryPolicy)
+    )
 }

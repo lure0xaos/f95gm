@@ -1,18 +1,21 @@
 package f95gm.client.ui.pages.auth
 
+import f95gm.domain.api.F95ApiPaths
+
 import dev.fritz2.core.*
-import f95gm.client.actions.auth.signIn
-import f95gm.client.actions.auth.updateCredentials
-import f95gm.client.state.session.credentials
-import f95gm.client.state.session.session
+import f95gm.client.actions.auth.CredentialCommand
+import f95gm.client.state.runtime.ClientLoginUiPort
+import f95gm.client.model.auth.error
+import f95gm.client.model.auth.busy
 import f95gm.client.ui.shared.navigation.primaryNavigationButtonClass
 import f95gm.client.ui.shared.textFieldClass
-import f95gm.domain.api.F95Api
 import f95gm.messages.UiMessages
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-internal fun RenderContext.loginPage() {
+internal fun RenderContext.loginPage(runtime: ClientLoginUiPort) {
+    val credentials = runtime.credentialsView
+    val session = runtime.sessionView
     div("login-page position-relative min-vh-100 overflow-hidden bg-black") {
         div("login-shell container min-vh-100 d-flex align-items-center py-4 py-lg-5 position-relative z-1") {
             div("login-layout row justify-content-start w-100") {
@@ -40,7 +43,7 @@ internal fun RenderContext.loginPage() {
                         h1("login-title h3 fw-bold mt-3 mb-2") { +UiMessages.app_signInToContinue() }
                         p("login-hint text-white-50 mb-0") { +UiMessages.app_credentialsHint() }
                         form("login-form vstack gap-2 mt-4") {
-                            action(F95Api.LOGIN)
+                            action(F95ApiPaths.LOGIN)
                             method("post")
                             label("form-label text-white-50 mt-2") { +UiMessages.app_usernameOrEmail() }
                             input(textFieldClass) {
@@ -50,7 +53,7 @@ internal fun RenderContext.loginPage() {
                                 required(true)
                                 placeholder(UiMessages.app_usernamePlaceholder())
                                 value(credentials.data.map { it.login })
-                                inputs.values() handledBy { updateCredentials(login = it) }
+                                inputs.values() handledBy { runtime.loginCommands.updateCredentials(CredentialCommand.SetLogin(it)) }
                             }
                             label("form-label text-white-50 mt-2") { +UiMessages.app_password() }
                             input(textFieldClass) {
@@ -60,13 +63,13 @@ internal fun RenderContext.loginPage() {
                                 required(true)
                                 placeholder(UiMessages.app_passwordPlaceholder())
                                 value(credentials.data.map { it.password })
-                                inputs.values() handledBy { updateCredentials(password = it) }
+                                inputs.values() handledBy { runtime.loginCommands.updateCredentials(CredentialCommand.SetPassword(it)) }
                             }
                             div("login-submit d-grid mt-3") {
                                 button(primaryNavigationButtonClass) {
                                     type("button")
                                     +UiMessages.app_openCatalog()
-                                    clicks handledBy { signIn() }
+                                    clicks handledBy { runtime.loginCommands.signIn() }
                                 }
                             }
                             div("login-status status-slot") {
@@ -78,7 +81,7 @@ internal fun RenderContext.loginPage() {
                                     }
                                 }
                             }
-                            submits { preventDefault() } handledBy { signIn() }
+                            submits { preventDefault() } handledBy { runtime.loginCommands.signIn() }
                         }
                         p("login-note text-white-50 small border-top pt-3 mt-4 mb-0") { +UiMessages.app_passwordNotSaved() }
                     }

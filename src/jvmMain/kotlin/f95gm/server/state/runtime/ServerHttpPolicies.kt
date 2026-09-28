@@ -5,8 +5,7 @@ import f95gm.server.upstream.request.UpstreamPolicy
 import kotlin.time.Duration.Companion.milliseconds
 
 internal data class ServerHttpPolicies(
-    val clientTimeouts: HttpClientTimeoutPolicy,
-    val upstream: UpstreamPolicy
+    val clientTimeouts: HttpClientTimeoutPolicy
 ) {
     companion object {
         fun from(config: ServerConfig): ServerHttpPolicies = ServerHttpPolicies(
@@ -14,11 +13,21 @@ internal data class ServerHttpPolicies(
                 requestMillis = config.timeouts.requestMillis,
                 connectMillis = config.timeouts.connectMillis,
                 socketMillis = config.timeouts.socketMillis
-            ),
-            upstream = UpstreamPolicy(
-                maxAttempts = config.retry.maxAttempts,
-                retryBaseDelay = config.retry.baseDelayMillis.value.milliseconds,
-                retryMaxDelay = config.retry.maxDelayMillis.value.milliseconds,
+            )
+        )
+    }
+}
+
+/** Upstream request retry policy is separate from local HTTP client transport settings. */
+internal data class ServerUpstreamPolicies(val request: UpstreamPolicy) {
+    companion object {
+        fun from(config: ServerConfig): ServerUpstreamPolicies = ServerUpstreamPolicies(
+            UpstreamPolicy(
+                maxAttempts = config.upstreamRetry.maxAttempts,
+                maxResponseBytes = config.limits.maxMediaResponseBytes,
+                retryBaseDelay = config.upstreamRetry.baseDelayMillis.value.milliseconds,
+                retryMaxDelay = config.upstreamRetry.maxDelayMillis.value.milliseconds,
+                maxTotalRetryDelay = config.upstreamRetry.maxTotalDelayMillis.value.milliseconds,
                 requestTimeout = config.timeouts.requestMillis.value.milliseconds
             )
         )

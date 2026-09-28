@@ -1,7 +1,8 @@
 package f95gm.server.http.response
 
+import f95gm.domain.api.ApiStatusCode
 import f95gm.domain.api.F95ApiError
-import f95gm.server.state.runtime.IdempotencyRegistry
+import f95gm.server.application.port.CachedResponse
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -9,6 +10,7 @@ import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.assertNotNull
 
 class RespondTest {
@@ -17,7 +19,7 @@ class RespondTest {
         application {
             routing {
                 get("/cacheable") {
-                    respondJsonCacheable(call, HttpStatusCode.OK, F95ApiError("cached"), maxAgeSeconds = -1)
+                    respondJsonCacheable(call, HttpStatusCode.OK, F95ApiError("cached"), maxAge = (-1).seconds)
                 }
             }
         }
@@ -41,8 +43,8 @@ class RespondTest {
                 get("/cached") {
                     respondCached(
                         this.call,
-                        IdempotencyRegistry.CachedResponse(
-                            status = HttpStatusCode.Accepted.value,
+                        CachedResponse(
+                            status = ApiStatusCode(HttpStatusCode.Accepted.value),
                             body = "accepted",
                             contentType = ContentType.Text.Plain.toString()
                         )

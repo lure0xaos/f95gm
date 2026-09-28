@@ -1,5 +1,6 @@
 [versions]
 fritz2 = "1.0-RC21"
+java = "25"
 kotlin = "2.4.10"
 ksp = "2.3.10"
 kotlinxSerialization = "1.9.0"
@@ -11,7 +12,7 @@ jsoup = "1.23.1"
 i18n4k = "0.11.2"
 kotlinLogging = "8.0.4"
 beryxRuntime = "2.0.1"
-detekt = "1.23.8"
+detekt = "2.0.0-alpha.6"
 
 [libraries]
 fritz2-core = { module = "dev.fritz2:core", version.ref = "fritz2" }
@@ -42,4 +43,4 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 i18n4k = { id = "de.comahe.i18n4k", version.ref = "i18n4k" }
 beryx-runtime = { id = "org.beryx.runtime", version.ref = "beryxRuntime" }
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }

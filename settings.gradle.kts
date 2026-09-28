@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "f95gm"
 include(":packaging")
+includeBuild("build-logic")

@@ -21,8 +21,9 @@ class ReadApiErrorTest {
 
         assertEquals("Filter name is already in use", parsed.message)
         assertEquals("INVALID_INPUT", parsed.code?.name)
-        assertEquals("server.validationFailed", parsed.messageKey)
-        assertEquals(mapOf("field" to "alias", "reason" to "duplicate"), parsed.details)
+        assertEquals("server.validationFailed", parsed.messageKey?.value)
+        assertEquals("alias", parsed.details.field)
+        assertEquals("duplicate", parsed.details.reason)
     }
 
     @Test
@@ -31,7 +32,7 @@ class ReadApiErrorTest {
         assertEquals("Request failed", malformed.message)
         assertNull(malformed.code)
         assertNull(malformed.messageKey)
-        assertEquals(emptyMap(), malformed.details)
+        assertEquals(null, malformed.details.field)
 
         val incomplete = parseApiError("{\"code\":\"INTERNAL\"}", fallback = "Request failed")
         assertEquals("Request failed", incomplete.message)

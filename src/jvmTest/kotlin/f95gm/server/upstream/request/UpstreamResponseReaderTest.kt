@@ -5,6 +5,7 @@ import f95gm.domain.values.F95SessionId
 import f95gm.server.model.auth.UpstreamSession
 import f95gm.server.model.http.UpstreamFailure
 import f95gm.server.model.http.UpstreamResponse
+import f95gm.server.config.Bytes
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
@@ -33,15 +34,15 @@ class UpstreamResponseReaderTest {
         var persisted = 0
 
         val response = client.get("/").let {
-            UpstreamResponseReader(100) { persisted++ }.read(it, session)
+            UpstreamResponseReader(Bytes(100)) { persisted++ }.read(it, session)
         }
 
         val success = assertIs<UpstreamResponse.Success>(response)
         assertEquals(HttpStatusCode.Created, success.status)
         assertEquals("body", success.body)
-        assertEquals(ContentType.Text.Plain.toString(), success.contentType)
-        assertEquals("https://example.test/next", success.location)
-        assertEquals("session-value", session.cookieEntries()["xf_session"])
+        assertEquals(ContentType.Text.Plain, success.contentType)
+        assertEquals("https://example.test/next", success.location?.value)
+        assertEquals("session-value", session.typedCookieEntries().entries.single { it.key.value == "xf_session" }.value.value)
         assertEquals(1, persisted)
         client.close()
     }
@@ -52,7 +53,7 @@ class UpstreamResponseReaderTest {
             respond("too-large", HttpStatusCode.OK)
         })
         val response = client.get("/").let {
-            UpstreamResponseReader(3) {}.read(it, session())
+            UpstreamResponseReader(Bytes(3)) {}.read(it, session())
         }
 
         val failure = assertIs<UpstreamResponse.Failure>(response)

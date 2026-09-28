@@ -1,6 +1,19 @@
 package f95gm.client.data.catalog
 
 import f95gm.client.data.api.apiErrorFallback
+import f95gm.client.data.api.CatalogItemPayload
+import f95gm.client.data.api.CatalogMessagePayload
+import f95gm.client.data.api.CatalogPayload
+import f95gm.client.data.api.PayloadParseResult
+import f95gm.client.data.api.ParseFailureReason
+import f95gm.client.data.api.parsePayload
+import f95gm.client.data.api.PayloadParseException
+import f95gm.client.data.api.PayloadPolicies
+import f95gm.client.data.api.PayloadEnvelopeException
+import f95gm.client.data.api.PayloadMappingException
+import f95gm.client.data.api.toValues
+import f95gm.client.model.runtime.EndpointId
+import f95gm.client.state.runtime.clientJson
 import f95gm.client.data.json.*
 import f95gm.client.model.catalog.Game
 import f95gm.client.state.config.ClientConstants
@@ -9,35 +22,41 @@ import f95gm.domain.defaults.F95Defaults
 import f95gm.domain.values.*
 import f95gm.messages.UiMessages
 import kotlinx.serialization.json.*
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.SerializationException
 
 internal fun parseCatalog(payload: String): CatalogResult {
-    val root = Json.parseToJsonElement(payload).jsonObject
-    if (root[F95JsonKeys.STATUS]?.jsonPrimitive?.contentOrNull != F95Defaults.API_OK) {
-        val message = root["msg"]?.jsonPrimitive?.contentOrNull ?: apiErrorFallback
-        error(message)
+    return when (val result = parseCatalogResult(payload)) {
+    is PayloadParseResult.Success -> result.value
+    is PayloadParseResult.Failure -> throw PayloadParseException(result.reason, "Catalog payload is invalid", endpoint = EndpointId("catalog"))
     }
-    val msg = root["msg"]?.jsonObject ?: error(apiErrorFallback)
-    val data = msg["data"]?.jsonArray.orEmpty().map { json ->
-        val item = json.jsonObject
-        Game(
-            threadId = F95ThreadId(item.string("thread_id")),
-            title = F95GameTitle(item.string("title", UiMessages.app_untitledRelease())),
-            version = F95GameVersion(item.string("version", UiMessages.app_versionUnknown())),
-            developer = F95DeveloperName(item.gameDeveloper()),
-            cover = F95CoverUrl(item.gameCover()),
-            tags = item["tags"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-                .map(::F95TagId),
-            prefixes = item.gamePrefixes().map(::F95PrefixId),
-            date = F95DateLabel(item.string("date", UiMessages.app_recently())),
-            likes = F95MetricText(item.string("likes", F95Defaults.ZERO_METRIC)),
-            views = F95MetricText(item.string("views", F95Defaults.ZERO_METRIC)),
-            rating = item["rating"]?.jsonPrimitive?.doubleOrNull ?: ClientConstants.NO_RATING,
-            isNew = item["new"]?.jsonPrimitive?.booleanOrNull == true
-        )
-    }
-    val pagination = msg["pagination"]?.jsonObject
-    return CatalogResult(
-        data, pagination?.int("total", F95Defaults.FIRST_PAGE)
-            ?.coerceAtLeast(F95Defaults.FIRST_PAGE) ?: F95Defaults.FIRST_PAGE
-    )
 }
+
+internal fun parseCatalogResult(payload: String): PayloadParseResult<CatalogResult> =
+    parsePayload<CatalogPayload, CatalogResult>(payload, policy = PayloadPolicies.Catalog) { root ->
+        if (root.status != F95Defaults.API_OK) {
+            throw PayloadEnvelopeException(root.msg?.jsonPrimitive?.contentOrNull ?: apiErrorFallback)
+        }
+        val messagePayload = root.msg?.toString() ?: throw PayloadEnvelopeException(apiErrorFallback)
+        val message = try {
+            clientJson.decodeFromString<CatalogMessagePayload>(messagePayload)
+        } catch (failure: SerializationException) {
+            throw PayloadMappingException(ParseFailureReason.INVALID_PAYLOAD, failure)
+        }
+        CatalogResult(message.data.map(::toGame), message.pagination?.total?.coerceAtLeast(F95Defaults.FIRST_PAGE) ?: F95Defaults.FIRST_PAGE)
+    }
+
+private fun toGame(item: CatalogItemPayload): Game = item.toValues().let { value -> Game(
+    threadId = F95ThreadId(value.threadId),
+    title = F95GameTitle(value.title.ifBlank { UiMessages.app_untitledRelease() }),
+    version = F95GameVersion(value.version.ifBlank { UiMessages.app_versionUnknown() }),
+    developer = F95DeveloperName(value.developer),
+    cover = F95CoverUrl(value.cover),
+    tags = value.tags.map(::F95TagId),
+    prefixes = value.prefixes.map(::F95PrefixId),
+    date = F95DateLabel(value.date.ifBlank { UiMessages.app_recently() }),
+    likes = F95MetricText(value.likes),
+    views = F95MetricText(value.views),
+    rating = value.rating ?: ClientConstants.NO_RATING,
+    isNew = value.isNew
+)}

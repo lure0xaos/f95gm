@@ -6,11 +6,15 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.nio.file.Files
+import java.nio.file.Path
+import java.io.IOException
 import kotlin.io.path.readBytes
+import kotlin.io.path.moveTo
 import kotlin.io.path.writeBytes
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class DatabaseBackupTest {
@@ -74,6 +78,41 @@ class DatabaseBackupTest {
                         )
                     }
                 }
+        } finally {
+            Files.walk(directory).sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists)
+        }
+    }
+
+    @Test
+    fun failedPromotionRestoresThePreviouslyPublishedBackupChain() {
+        val directory = Files.createTempDirectory("f95gm-backup-rollback-test")
+        val database = directory.resolve("f95gm.mv.db")
+        val backup = directory.resolve("f95gm.mv.db.bak")
+        try {
+            val originalGenerations = (1..4).map { generation ->
+                "database-generation-$generation".encodeToByteArray().also { bytes ->
+                    database.writeBytes(bytes)
+                    createDatabaseBackup(database, backup)
+                }
+            }
+            database.writeBytes("new-database-generation".encodeToByteArray())
+            var failPromotion = true
+            val move: (Path, Path) -> Unit = { source, target ->
+                if (failPromotion && target == backup && source.fileName.toString().endsWith(".backup.tmp")) {
+                    failPromotion = false
+                    throw IOException("injected backup promotion failure")
+                }
+                source.moveTo(target, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+
+            assertFailsWith<IOException> { createDatabaseBackup(database, backup, move) }
+
+            assertContentEquals(originalGenerations[3], backup.readBytes())
+            assertContentEquals(originalGenerations[2], directory.resolve("f95gm.mv.db.bak.1").readBytes())
+            assertContentEquals(originalGenerations[1], directory.resolve("f95gm.mv.db.bak.2").readBytes())
+            assertContentEquals(originalGenerations[0], directory.resolve("f95gm.mv.db.bak.3").readBytes())
+            assertTrue(Files.list(directory).use { files -> files.noneMatch { ".rotation." in it.fileName.toString() } })
+            assertTrue(Files.list(directory).use { files -> files.noneMatch { it.fileName.toString().endsWith(".backup.tmp") } })
         } finally {
             Files.walk(directory).sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists)
         }

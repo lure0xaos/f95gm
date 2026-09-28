@@ -1,83 +1,6 @@
 
-import java.net.HttpURLConnection
-import java.net.ServerSocket
-import java.net.URI
-
-abstract class VerifyInstallerInputsTask : DefaultTask() {
-    @get:InputFiles
-    abstract val installerInputs: ConfigurableFileCollection
-
-    @TaskAction
-    fun verify() {
-        installerInputs.files.forEach { input ->
-            check(input.isFile) { "Missing installer input: $input" }
-        }
-    }
-}
-
-abstract class SmokePackagedLauncherTask : DefaultTask() {
-    @get:InputFile
-    abstract val launcher: RegularFileProperty
-
-    @get:Input
-    @get:Optional
-    abstract val runSmoke: Property<Boolean>
-
-    @TaskAction
-    fun verify() {
-        val launcherFile = launcher.get().asFile
-        check(launcherFile.isFile) { "Missing packaged launcher: $launcherFile" }
-        check(
-            launcherFile.readText().contains("f95gm", ignoreCase = true) || launcherFile.readText()
-                .contains("packaging", ignoreCase = true)
-        ) {
-            "Packaged launcher does not reference the application"
-        }
-        if (runSmoke.getOrElse(false)) {
-            val port = ServerSocket(0).use { it.localPort }
-            val javaToolOptions = listOf(
-                System.getenv("JAVA_TOOL_OPTIONS"),
-                "-Df95gm.host=127.0.0.1",
-                "-Df95gm.port=$port",
-                "-Df95gm.openBrowser=false"
-            ).filterNot { it.isNullOrBlank() }.joinToString(" ")
-            val command = if (launcherFile.extension.equals("bat", ignoreCase = true)) {
-                listOf("cmd.exe", "/c", launcherFile.absolutePath)
-            } else {
-                listOf(launcherFile.absolutePath)
-            }
-            val process = ProcessBuilder(command).redirectErrorStream(true).apply {
-                environment()["JAVA_TOOL_OPTIONS"] = javaToolOptions
-            }.start()
-            try {
-                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
-                var status: Int? = null
-                while (System.nanoTime() < deadline && status == null) {
-                    try {
-                        status = (URI("http://127.0.0.1:$port/api/health?tabId=packaged-smoke").toURL()
-                            .openConnection() as HttpURLConnection).run {
-                            connectTimeout = 500
-                            readTimeout = 500
-                            requestMethod = "GET"
-                            responseCode
-                        }
-                    } catch (_: Exception) {
-                        Thread.sleep(100)
-                    }
-                    if (process.waitFor(0, TimeUnit.MILLISECONDS)) {
-                        val output = process.inputStream.bufferedReader().readText().takeLast(4_000)
-                        error("Packaged launcher exited with ${process.exitValue()} before health became ready${if (output.isBlank()) "" else ": $output"}")
-                    }
-                }
-                check(status == 200) { "Packaged application did not become healthy on port $port" }
-            } finally {
-                process.toHandle().descendants().forEach { child -> child.destroyForcibly() }
-                process.destroy()
-                if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
-            }
-        }
-    }
-}
+import f95gm.build.SmokePackagedLauncherTask
+import f95gm.build.VerifyInstallerInputsTask
 
 plugins {
     alias(libs.plugins.beryx.runtime)
@@ -178,7 +101,7 @@ val verifyInstallerInputs = tasks.register<VerifyInstallerInputsTask>("verifyIns
 }
 
 verifyInstallerInputs.configure {
-    dependsOn(rootProject.tasks.named("copyJsToJvm"))
+    dependsOn(rootProject.tasks.named("generateAssetManifest"))
 }
 
 tasks.named("jpackage") { dependsOn(verifyInstallerInputs) }

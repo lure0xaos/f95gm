@@ -1,5 +1,7 @@
 package f95gm.server.upstream.parser
 
+import f95gm.server.upstream.parser.detail.detailSectionLabels
+
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 

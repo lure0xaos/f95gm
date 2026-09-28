@@ -1,5 +1,7 @@
 package f95gm.client.actions.catalog.loading
 
-internal fun retryCatalog() {
-    launchCatalogLoad()
+import f95gm.client.state.runtime.ClientCatalogActionsPort
+
+internal fun retryCatalog(runtime: ClientCatalogActionsPort) {
+    launchCatalogLoad(runtime)
 }

@@ -63,5 +63,6 @@ class ServerShutdownControllerTest {
         } finally {
             controller.close()
         }
+        assertFalse(controller.isShutdownScopeActive)
     }
 }

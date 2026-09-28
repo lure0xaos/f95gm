@@ -1,24 +1,25 @@
 package f95gm.client.actions.marks.pagination
 
 import f95gm.client.model.marks.markedGamesView
-import f95gm.client.state.marks.marks
-import f95gm.client.state.runtime.scope
+import f95gm.client.state.runtime.ClientMarksActionsPort
+import f95gm.client.ui.shared.pagination.PageEditMode
+import f95gm.domain.api.parseIntOrNull
 import f95gm.domain.defaults.F95Defaults
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-internal fun submitMarkedPageInput() {
-    scope.launch {
-        val current = marks.data.first()
+internal fun submitMarkedPageInput(runtime: ClientMarksActionsPort) {
+    runtime.launchEffect {
+        val current = runtime.marks.data.first()
         val view = markedGamesView(current)
-        val nextPage = current.pageInput.toIntOrNull()
+        val nextPage = current.pageInput.value.parseIntOrNull()
             ?.coerceIn(F95Defaults.FIRST_PAGE, view.totalPages)
             ?: view.page
-        marks.enqueue {
+        runtime.marks.enqueue {
             it.copy(
                 page = nextPage,
-                editingPage = false,
-                pageInput = F95Defaults.EMPTY
+                editingPage = PageEditMode.BROWSING,
+                pageInput = f95gm.client.model.runtime.PageInput.EMPTY
             )
         }
     }

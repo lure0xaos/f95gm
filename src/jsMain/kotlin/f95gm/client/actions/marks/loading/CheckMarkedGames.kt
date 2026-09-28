@@ -1,5 +1,7 @@
 package f95gm.client.actions.marks.loading
 
-internal fun checkMarkedGames(notification: MarkCheckNotification) {
-    launchMarkedGamesCheck(notification)
+import f95gm.client.state.runtime.ClientMarksActionsPort
+
+internal fun checkMarkedGames(runtime: ClientMarksActionsPort, notification: MarkCheckNotification) {
+    launchMarkedGamesCheck(runtime, notification)
 }

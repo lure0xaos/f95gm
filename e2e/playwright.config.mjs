@@ -7,7 +7,8 @@ export default defineConfig({
     webServer: [
         {
             command: 'node mock-upstream.mjs',
-            url: `${process.env.F95GM_MOCK_UPSTREAM_URL ?? 'http://127.0.0.1:18081'}/health`,
+            ignoreHTTPSErrors: true,
+            url: `${process.env.F95GM_MOCK_UPSTREAM_URL ?? 'https://localhost:18081'}/health`,
             timeout: 30_000,
             reuseExistingServer: false,
         },

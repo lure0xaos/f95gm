@@ -1,5 +1,5 @@
 package f95gm.server.config.upstream
 
-import f95gm.server.config.constants.ServerConstants
+import f95gm.server.config.protocol.UpstreamProtocolConfig
 
-internal const val upstreamUserAgent = ServerConstants.UPSTREAM_USER_AGENT
+internal const val upstreamUserAgent = UpstreamProtocolConfig.USER_AGENT

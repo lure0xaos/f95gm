@@ -1,14 +1,17 @@
 package f95gm.server.http.request.origin
 
-import java.net.URI
-import java.net.URISyntaxException
+import f95gm.server.http.request.UriParsing
+import f95gm.server.http.request.parseUri
 
 internal class OriginPolicy(
     private val expectedHost: String,
     private val expectedPort: Int
 ) {
-    fun accepts(origin: String): Boolean = try {
-        val uri = URI(origin)
+    fun accepts(origin: String): Boolean {
+        val uri = when (val parsed = parseUri(origin)) {
+            is UriParsing.Valid -> parsed.uri
+            UriParsing.Invalid -> return false
+        }
         val scheme = uri.scheme?.lowercase() ?: return false
         if (scheme != "http" && scheme != "https") return false
         val host = uri.host?.lowercase() ?: return false
@@ -18,10 +21,6 @@ internal class OriginPolicy(
                 (localHost == "127.0.0.1" && host == "localhost") ||
                 (localHost == "::1" && host == "::1")
         val port = if (uri.port == -1) if (scheme == "https") 443 else 80 else uri.port
-        hostMatches && port == expectedPort
-    } catch (_: URISyntaxException) {
-        false
-    } catch (_: IllegalArgumentException) {
-        false
+        return hostMatches && port == expectedPort
     }
 }

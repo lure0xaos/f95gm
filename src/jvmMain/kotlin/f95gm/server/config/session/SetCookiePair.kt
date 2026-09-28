@@ -1,7 +1,9 @@
 package f95gm.server.config.session
 
-internal fun setCookiePairs(header: String): List<Pair<String, String>> {
-    val pairs = mutableListOf<Pair<String, String>>()
+internal data class SetCookiePair(val name: String, val value: String)
+
+internal fun setCookiePairs(header: String): List<SetCookiePair> {
+    val pairs = mutableListOf<SetCookiePair>()
     var candidate = 0
     while (candidate >= 0) {
         val nameEnd = cookieNameEnd(header, candidate)
@@ -11,7 +13,7 @@ internal fun setCookiePairs(header: String): List<Pair<String, String>> {
             val name = header.substring(candidate, nameEnd)
             val value = header.substring(valueStart, valueEnd).trim()
             if (name.all(::isCookieNameCharacter) && value.none { it == ';' || it == '\r' || it == '\n' || it.code < 0x20 }) {
-                pairs += name to value
+                pairs += SetCookiePair(name, value)
             }
             candidate = nextCookiePairStart(header, valueEnd)
         } else {

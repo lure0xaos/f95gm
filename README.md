@@ -52,6 +52,10 @@ local browser session and persisted upstream session.
 The repository includes the Gradle wrapper, so a separate Gradle installation is not required. On Windows, use
 `gradlew.bat`; on macOS/Linux, use `./gradlew`.
 
+The wrapper performs a Java-version preflight before starting Gradle and requires Java 17 or newer. Because the
+project's Kotlin JVM toolchain is Java 25, use JDK 25 for local builds and set `JAVA_HOME` to that installation. A
+Java 8 runtime is not supported, even if it is the default system JDK.
+
 ### Run the complete application
 
 From the repository root:

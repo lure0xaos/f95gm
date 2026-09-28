@@ -3,15 +3,14 @@ package f95gm.client.state.settings
 import f95gm.client.model.settings.*
 import f95gm.client.state.runtime.BrowserStorage
 
-internal fun loadAppSettings(): AppSettingsState {
+internal fun loadAppSettings(storage: BrowserStorage): AppSettingsState {
     return AppSettingsState(
-        theme = AppTheme.fromValue(BrowserStorage.read(SettingsStorageKeys.THEME)),
-        lazyLoadImages = BrowserStorage.read(SettingsStorageKeys.LAZY_LOAD_IMAGES)?.equals("true", ignoreCase = true)
-            ?: true,
-        updateCheckInterval = UpdateCheckInterval.fromMillis(
-            BrowserStorage.read(SettingsStorageKeys.UPDATE_CHECK_INTERVAL)?.toLongOrNull()
+        theme = SettingsStorageCodec.decodeTheme(storage.readOrNull(SettingsStorageKeys.THEME)),
+        lazyLoadImages = SettingsStorageCodec.decodeBoolean(storage.readOrNull(SettingsStorageKeys.LAZY_LOAD_IMAGES), true),
+        updateCheckInterval = SettingsStorageCodec.decodeUpdateCheckInterval(
+            storage.readOrNull(SettingsStorageKeys.UPDATE_CHECK_INTERVAL)
         ),
-        pageSize = PageSize.fromValue(BrowserStorage.read(SettingsStorageKeys.PAGE_SIZE)?.toIntOrNull()),
-        cardSize = CardSize.fromValue(BrowserStorage.read(SettingsStorageKeys.CARD_SIZE))
+        pageSize = SettingsStorageCodec.decodePageSize(storage.readOrNull(SettingsStorageKeys.PAGE_SIZE)),
+        cardSize = SettingsStorageCodec.decodeCardSize(storage.readOrNull(SettingsStorageKeys.CARD_SIZE))
     )
 }

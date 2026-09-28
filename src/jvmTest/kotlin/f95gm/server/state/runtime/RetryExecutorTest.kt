@@ -1,11 +1,20 @@
 package f95gm.server.state.runtime
 
-import f95gm.server.config.Millis
+import f95gm.server.kernel.retryBlocking
+import f95gm.server.kernel.retrySuspending
+import f95gm.server.kernel.RetryAttemptLimit
+import f95gm.server.kernel.RetryFailureReason
+import f95gm.server.kernel.RetryExecutor
+
+import f95gm.server.kernel.RetryDecision
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class RetryExecutorTest {
     @Test
@@ -14,9 +23,9 @@ class RetryExecutorTest {
         val delays = mutableListOf<Long>()
 
         val result = retryBlocking(
-            maxAttempts = 3,
-            delayMillis = { attempt -> attempt * 10L },
-            sleep = delays::add,
+            maxAttempts = RetryAttemptLimit(3),
+            delay = { attempt -> (attempt * 10L).milliseconds },
+            sleep = { delays += it.inWholeMilliseconds },
             operation = { attempt ->
                 calls++
                 if (attempt < 2) error("temporary")
@@ -35,8 +44,8 @@ class RetryExecutorTest {
         var calls = 0
         assertFailsWith<IllegalStateException> {
             retryBlocking(
-                maxAttempts = 3,
-                delayMillis = { 0L },
+                maxAttempts = RetryAttemptLimit(3),
+                delay = { 0.milliseconds },
                 sleep = {},
                 operation = { calls++; error("permanent") },
                 isRetryable = { false }
@@ -51,11 +60,11 @@ class RetryExecutorTest {
         var calls = 0
 
         val result = retrySuspending(
-            maxAttempts = 3,
-            pause = delays::add,
+            maxAttempts = RetryAttemptLimit(3),
+            pause = { delays += it.inWholeMilliseconds },
             operation = { attempt ->
                 calls++
-                if (attempt == 0) RetryDecision.Again(Millis(-50))
+                if (attempt == 0) RetryDecision.Again((-50).milliseconds)
                 else RetryDecision.Return("ok")
             }
         )
@@ -66,12 +75,32 @@ class RetryExecutorTest {
     }
 
     @Test
+    fun suspendingRetryDoesNotPauseAfterTheFinalAttempt() = runTest {
+        var calls = 0
+        val delays = mutableListOf<Long>()
+        val failure = assertFailsWith<RetryExecutor> {
+            retrySuspending<String>(
+                maxAttempts = RetryAttemptLimit(1),
+                pause = { delays += it.inWholeMilliseconds },
+                maxTotalDelay = 0.milliseconds
+            ) {
+                calls++
+                RetryDecision.Again(5.seconds)
+            }
+        }
+
+        assertEquals(RetryFailureReason.NO_RESULT, failure.reason)
+        assertEquals(1, calls)
+        assertEquals(emptyList(), delays)
+    }
+
+    @Test
     fun retryRejectsAnEmptyAttemptBudget() {
         assertFailsWith<IllegalArgumentException> {
-            retryBlocking(0, { 0L }, {}, { "unused" }, { true })
+            retryBlocking(RetryAttemptLimit(0), { 0.milliseconds }, {}, { "unused" }, { true })
         }
         assertFailsWith<IllegalArgumentException> {
-            runTest { retrySuspending<String>(0) { RetryDecision.Return("unused") } }
+            runTest { retrySuspending<String>(RetryAttemptLimit(0)) { RetryDecision.Return("unused") } }
         }
     }
 
@@ -79,11 +108,26 @@ class RetryExecutorTest {
     fun suspendingRetryPropagatesCancellationWithoutStartingAnotherAttempt() = runTest {
         var calls = 0
         assertFailsWith<CancellationException> {
-            retrySuspending<String>(3, pause = { throw CancellationException("shutdown") }) {
+            retrySuspending<String>(RetryAttemptLimit(3), pause = { throw CancellationException("shutdown") }) {
                 calls++
-                RetryDecision.Again(Millis(1))
+                RetryDecision.Again(1.milliseconds)
             }
         }
         assertEquals(1, calls)
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun suspendingRetryUsesVirtualTimeForDefaultBackoff() = runTest {
+        var calls = 0
+        val result = retrySuspending<String>(RetryAttemptLimit(2)) {
+            calls++
+            if (calls == 1) RetryDecision.Again(5.seconds) else RetryDecision.Return("ok")
+        }
+
+        advanceUntilIdle()
+        assertEquals("ok", result)
+        assertEquals(2, calls)
+        assertEquals(5_000, testScheduler.currentTime)
     }
 }
